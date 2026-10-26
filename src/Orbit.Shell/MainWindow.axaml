@@ -1,0 +1,1268 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:contracts="using:Orbit.Contracts"
+        xmlns:conv="using:Avalonia.Data.Converters"
+        xmlns:i18n="using:Orbit.Shell.I18n"
+        xmlns:vm="using:Orbit.Shell.ViewModels"
+        x:Class="Orbit.Shell.MainWindow"
+        Title="Orbit"
+        Icon="/Assets/orbit.ico"
+        Width="1380"
+        Height="860"
+        MinWidth="1024"
+        MinHeight="640"
+        Background="Transparent"
+        TransparencyLevelHint="Mica, AcrylicBlur"
+        TransparencyBackgroundFallback="{StaticResource OrbitFallbackBg}">
+  <ExperimentalAcrylicBorder Material="{StaticResource OrbitAcrylicShell}">
+  <Grid Margin="10">
+    <Grid ColumnDefinitions="248,8,*,8,292">
+      <!-- ===== Left: Agents + History ===== -->
+      <Border Grid.Column="0"
+              MinWidth="200"
+              Classes="glass-panel"
+              Padding="0">
+        <DockPanel Margin="14,14,12,12">
+          <StackPanel DockPanel.Dock="Top" Spacing="10" Margin="2,0,2,12">
+            <TextBlock Text="Orbit"
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       Margin="4,0,0,2" />
+            <Button x:Name="NewChatButton"
+                    Classes="ghost new-chat"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Left"
+                    Padding="10,8"
+                    ToolTip.Tip="Start another session on this Agent"
+                    Click="NewSessionButton_OnClick"
+                    Content="+ New chat" />
+            <TextBlock x:Name="HintDoubleClickAgent"
+                       FontSize="11"
+                       Foreground="{StaticResource OrbitMuted}"
+                       Text="Double-click Agent: load / unload" />
+            <Border Classes="glass-chip" Padding="2">
+              <Button x:Name="WorkspaceChipButton"
+                      Classes="ghost"
+                      HorizontalAlignment="Stretch"
+                      HorizontalContentAlignment="Left"
+                      Padding="8,6"
+                      Click="WorkspaceChip_OnClick"
+                      ToolTip.Tip="Workspace">
+                <TextBlock x:Name="WorkspaceChipText"
+                           FontSize="11"
+                           TextTrimming="CharacterEllipsis"
+                           Text="No workspace" />
+              </Button>
+            </Border>
+          </StackPanel>
+
+          <Grid DockPanel.Dock="Bottom"
+                Margin="2,12,2,0"
+                ColumnDefinitions="*,Auto"
+                ColumnSpacing="6">
+            <Border Classes="glass-chip" Padding="10,9">
+              <TextBlock x:Name="LlmBadgeText"
+                         FontWeight="SemiBold"
+                         FontSize="12"
+                         Text="LLM · …"
+                         TextTrimming="CharacterEllipsis"
+                         VerticalAlignment="Center" />
+            </Border>
+            <Button x:Name="SettingsButton"
+                    Grid.Column="1"
+                    Classes="ghost icon-btn"
+                    Width="36"
+                    Height="36"
+                    Padding="0"
+                    ToolTip.Tip="Settings"
+                    Click="OpenSettingsButton_OnClick"
+                    VerticalAlignment="Center">
+              <TextBlock FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, Segoe UI Symbol"
+                         Text="&#xE713;"
+                         FontSize="16"
+                         HorizontalAlignment="Center"
+                         VerticalAlignment="Center" />
+            </Button>
+          </Grid>
+
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="14">
+              <StackPanel Spacing="6">
+                <TextBlock x:Name="AgentsSidebarTitle"
+                           Text="Agents"
+                           Margin="8,0,0,0"
+                           FontSize="11"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource OrbitSubtle}" />
+                <ListBox x:Name="AgentsList"
+                         SelectionChanged="AgentsList_OnSelectionChanged"
+                         DoubleTapped="AgentsList_OnDoubleTapped">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="contracts:AgentInfo">
+                      <StackPanel Spacing="2" Margin="0,2">
+                        <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock FontSize="11"
+                                   Foreground="{StaticResource OrbitMuted}"
+                                   Text="{Binding Lifecycle, Converter={x:Static i18n:LifecycleLabelConverter.Instance}}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </StackPanel>
+
+              <StackPanel Spacing="6">
+                <TextBlock x:Name="HistoryTitle"
+                           Margin="8,0,4,0"
+                           Text="History"
+                           FontSize="11"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource OrbitSubtle}"
+                           VerticalAlignment="Center" />
+                <CheckBox x:Name="ShowArchivedCheck"
+                          Margin="8,0,4,0"
+                          FontSize="11"
+                          Content="Show archived"
+                          IsCheckedChanged="ShowArchivedCheck_OnIsCheckedChanged" />
+                <ListBox x:Name="SessionsList" SelectionChanged="SessionsList_OnSelectionChanged">
+                  <ListBox.ContextMenu>
+                    <ContextMenu>
+                      <MenuItem x:Name="ArchiveSessionMenu"
+                                Header="Archive…"
+                                Click="ArchiveSessionMenu_OnClick" />
+                      <MenuItem x:Name="DeleteSessionMenu"
+                                Header="Delete…"
+                                Click="DeleteSessionMenu_OnClick" />
+                    </ContextMenu>
+                  </ListBox.ContextMenu>
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SessionRowVm">
+                      <StackPanel Spacing="2" Margin="0,2">
+                        <Grid ColumnDefinitions="*,Auto">
+                          <TextBlock Text="{Binding Title}"
+                                     FontWeight="SemiBold"
+                                     TextTrimming="CharacterEllipsis"
+                                     TextWrapping="NoWrap" />
+                          <TextBlock Grid.Column="1"
+                                     Text="{Binding ArchivedBadge}"
+                                     FontSize="10"
+                                     Foreground="{StaticResource OrbitSubtle}"
+                                     IsVisible="{Binding IsArchived}"
+                                     Margin="6,0,0,0"
+                                     VerticalAlignment="Center" />
+                        </Grid>
+                        <TextBlock FontSize="11"
+                                   Foreground="{StaticResource OrbitMuted}"
+                                   Text="{Binding UpdatedAt, StringFormat={}{0:MM-dd HH:mm}}" />
+                        <TextBlock FontSize="10"
+                                   Foreground="{StaticResource OrbitSubtle}"
+                                   Text="{Binding WorkspacePath}"
+                                   TextTrimming="CharacterEllipsis"
+                                   IsVisible="{Binding WorkspacePath, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+              </StackPanel>
+            </StackPanel>
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+
+      <GridSplitter Grid.Column="1"
+                    Classes="orbit-split"
+                    ResizeDirection="Columns" />
+
+      <!-- ===== Center: Conversation ===== -->
+      <Border Grid.Column="2"
+              MinWidth="420"
+              Classes="glass-panel"
+              Padding="0">
+      <Grid RowDefinitions="Auto,*,Auto"
+            Background="Transparent">
+        <Border Grid.Row="0"
+                Padding="22,16,22,14"
+                Background="{StaticResource OrbitGlassSoft}"
+                BorderBrush="{StaticResource OrbitGlassStrokeSoft}"
+                BorderThickness="0,0,0,1">
+          <Grid ColumnDefinitions="*,Auto">
+            <StackPanel Spacing="3">
+              <TextBlock x:Name="ConversationTitle"
+                         FontSize="16"
+                         FontWeight="SemiBold"
+                         Text="Select or create a session" />
+              <TextBlock x:Name="ConversationSubtitle"
+                         FontSize="12"
+                         Foreground="{StaticResource OrbitMuted}"
+                         Text="Choose an Agent and History on the left" />
+            </StackPanel>
+            <Border Grid.Column="1"
+                    VerticalAlignment="Center"
+                    Classes="glass-chip"
+                    Padding="3">
+              <StackPanel Orientation="Horizontal" Spacing="2">
+                <Button x:Name="ViewChatButton"
+                        Classes="view-mode view-mode-active"
+                        Content="Chat"
+                        Padding="12,5"
+                        Click="ViewChatButton_OnClick" />
+                <Button x:Name="ViewTraceButton"
+                        Classes="view-mode"
+                        Content="Trace"
+                        Padding="12,5"
+                        Click="ViewTraceButton_OnClick" />
+              </StackPanel>
+            </Border>
+          </Grid>
+        </Border>
+
+        <Grid Grid.Row="1">
+          <!-- 对话列铺满中间栏；行内再左/右对齐（勿 Center+内容收缩，否则气泡会漂在正中间） -->
+          <ScrollViewer x:Name="ConversationScroll"
+                        Padding="28,16"
+                        HorizontalScrollBarVisibility="Disabled"
+                        VerticalScrollBarVisibility="Auto"
+                        HorizontalContentAlignment="Stretch"
+                        Background="{StaticResource OrbitChatWell}">
+            <ItemsControl x:Name="EntriesList"
+                          HorizontalAlignment="Stretch">
+              <ItemsControl.Styles>
+                <Style Selector="ItemsControl > ContentPresenter">
+                  <Setter Property="HorizontalAlignment" Value="Stretch" />
+                </Style>
+              </ItemsControl.Styles>
+              <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <StackPanel Spacing="6" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:SessionEntryVm">
+                  <Grid HorizontalAlignment="Stretch" MinHeight="1">
+                    <!-- User bubble (right) -->
+                    <StackPanel IsVisible="{Binding IsUser}"
+                                Spacing="4"
+                                HorizontalAlignment="Right"
+                                MaxWidth="520"
+                                Margin="80,2,0,2">
+                      <Border Background="{StaticResource OrbitUserBubble}"
+                              CornerRadius="16"
+                              Padding="14,10"
+                              HorizontalAlignment="Right">
+                        <SelectableTextBlock Text="{Binding DisplayBody}"
+                                             TextWrapping="Wrap"
+                                             LineHeight="20"
+                                             FontSize="13.5"
+                                             SelectionBrush="#402196F3" />
+                      </Border>
+                      <Button Classes="ghost"
+                              Content="{Binding CopyLabel}"
+                              Padding="6,2"
+                              FontSize="11"
+                              HorizontalAlignment="Right"
+                              Tag="{Binding DisplayBody}"
+                              Click="CopyMessageButton_OnClick" />
+                    </StackPanel>
+
+                    <!-- Assistant bubble (left) -->
+                    <StackPanel IsVisible="{Binding IsAssistant}"
+                                Spacing="4"
+                                HorizontalAlignment="Left"
+                                MaxWidth="720"
+                                Margin="0,2,80,2">
+                      <!-- Selectable first (drag-copy); Markdown.Avalonia does not support selection. -->
+                      <SelectableTextBlock Text="{Binding DisplayBody}"
+                                           TextWrapping="Wrap"
+                                           LineHeight="20"
+                                           FontSize="13.5"
+                                           SelectionBrush="#402196F3" />
+                      <DockPanel LastChildFill="False">
+                        <TextBlock Text="{Binding Timestamp}"
+                                   FontSize="11"
+                                   Foreground="{StaticResource OrbitSubtle}"
+                                   VerticalAlignment="Center" />
+                        <Button DockPanel.Dock="Right"
+                                Classes="ghost"
+                                Content="{Binding CopyLabel}"
+                                Padding="6,2"
+                                FontSize="11"
+                                Tag="{Binding DisplayBody}"
+                                Click="CopyMessageButton_OnClick" />
+                      </DockPanel>
+                    </StackPanel>
+
+                    <!-- Thought：一行标题，展开才见正文（Cursor 风） -->
+                    <Expander Classes="chat-activity"
+                              IsVisible="{Binding IsThought}"
+                              IsExpanded="{Binding IsExpanded, Mode=TwoWay}"
+                              HorizontalAlignment="Left"
+                              MaxWidth="720"
+                              Margin="0,1,80,1">
+                      <Expander.Header>
+                        <TextBlock FontSize="12.5"
+                                   Foreground="{StaticResource OrbitSubtle}"
+                                   Text="{Binding SummaryLabel}" />
+                      </Expander.Header>
+                      <SelectableTextBlock Text="{Binding DisplayBody}"
+                                           TextWrapping="Wrap"
+                                           FontSize="12"
+                                           Foreground="{StaticResource OrbitMuted}"
+                                           Margin="18,2,0,4"
+                                           SelectionBrush="#402196F3" />
+                    </Expander>
+
+                    <!-- 工具：一行一条 Read / Searched / Ran … -->
+                    <TextBlock IsVisible="{Binding IsToolChip}"
+                               HorizontalAlignment="Left"
+                               MaxWidth="720"
+                               Margin="2,1,80,1"
+                               FontSize="12.5"
+                               Foreground="{StaticResource OrbitMuted}"
+                               Text="{Binding SummaryLabel}"
+                               TextTrimming="CharacterEllipsis" />
+
+                    <!-- Todo：轻量清单 -->
+                    <Border IsVisible="{Binding IsTodoCard}"
+                            Background="Transparent"
+                            BorderBrush="{StaticResource OrbitBorder}"
+                            BorderThickness="0,0,0,0"
+                            Padding="2,6,2,6"
+                            HorizontalAlignment="Left"
+                            MaxWidth="520"
+                            Margin="0,2,80,2">
+                      <StackPanel Spacing="4">
+                        <DockPanel LastChildFill="True">
+                          <TextBlock Text="{Binding TodoProgressLabel}"
+                                     DockPanel.Dock="Right"
+                                     FontSize="11"
+                                     Foreground="{StaticResource OrbitSubtle}"
+                                     VerticalAlignment="Center" />
+                          <TextBlock Text="{Binding SummaryLabel}"
+                                     FontSize="12"
+                                     Foreground="{StaticResource OrbitMuted}" />
+                        </DockPanel>
+                        <ItemsControl ItemsSource="{Binding TodoItems}">
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TodoItemVm">
+                              <Grid ColumnDefinitions="Auto,*" Margin="0,1">
+                                <TextBlock Text="{Binding Glyph}"
+                                           Width="16"
+                                           FontSize="12"
+                                           Foreground="{StaticResource OrbitSubtle}"
+                                           VerticalAlignment="Top" />
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding Title}"
+                                           FontSize="12.5"
+                                           TextWrapping="Wrap"
+                                           Foreground="{StaticResource OrbitMuted}"
+                                           Opacity="{Binding TitleOpacity}" />
+                              </Grid>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                    </Border>
+
+                    <TextBlock IsVisible="{Binding IsMetaQuiet}"
+                               HorizontalAlignment="Left"
+                               FontSize="11"
+                               Foreground="{StaticResource OrbitSubtle}"
+                               Opacity="0.7"
+                               Text="{Binding SummaryLabel}"
+                               Margin="2,0" />
+
+                    <!-- ask_user_choice：选项按钮 -->
+                    <Border IsVisible="{Binding IsChoiceCard}"
+                            Background="{StaticResource OrbitApprovalBg}"
+                            BorderBrush="{StaticResource OrbitApprovalBorder}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="14,12"
+                            HorizontalAlignment="Left"
+                            MaxWidth="640"
+                            Margin="0,4,80,4">
+                      <StackPanel Spacing="10">
+                        <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="#9A7B1A" Text="{Binding ApprovalStatusLabel}" />
+                        <SelectableTextBlock Text="{Binding ApprovalText}"
+                                             FontWeight="SemiBold"
+                                             TextWrapping="Wrap"
+                                             SelectionBrush="#402196F3" />
+                        <ItemsControl ItemsSource="{Binding ChoiceOptions}"
+                                      IsVisible="{Binding ShowDecisionButtons}">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                              <WrapPanel Orientation="Horizontal" />
+                            </ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ApprovalChoiceOptionVm">
+                              <Button Classes="primary"
+                                      Content="{Binding Label}"
+                                      Margin="0,0,8,8"
+                                      Tag="{Binding}"
+                                      Click="ChoiceOptionButton_OnClick" />
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Content="{Binding RejectLabel}"
+                                Tag="{Binding EntryId}"
+                                HorizontalAlignment="Left"
+                                IsVisible="{Binding ShowDecisionButtons}"
+                                Click="RejectButton_OnClick" />
+                      </StackPanel>
+                    </Border>
+
+                    <!-- ask_user_confirm：计划/确认 -->
+                    <Border IsVisible="{Binding IsConfirmCard}"
+                            Background="{StaticResource OrbitApprovalBg}"
+                            BorderBrush="{StaticResource OrbitApprovalBorder}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="14,12"
+                            HorizontalAlignment="Left"
+                            MaxWidth="640"
+                            Margin="0,4,80,4">
+                      <StackPanel Spacing="10">
+                        <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="#9A7B1A" Text="{Binding ApprovalStatusLabel}" />
+                        <TextBlock IsVisible="{Binding HasCardTitle}"
+                                   Text="{Binding CardTitle}"
+                                   FontWeight="SemiBold"
+                                   TextWrapping="Wrap" />
+                        <SelectableTextBlock Text="{Binding ApprovalText}"
+                                             TextWrapping="Wrap"
+                                             SelectionBrush="#402196F3" />
+                        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowDecisionButtons}">
+                          <Button Classes="primary" Content="{Binding ApproveLabel}" Tag="{Binding EntryId}" Click="ConfirmApproveButton_OnClick" />
+                          <Button Content="{Binding RejectLabel}" Tag="{Binding EntryId}" Click="RejectButton_OnClick" />
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
+
+                    <Border IsVisible="{Binding IsPendingApproval}"
+                            Background="{StaticResource OrbitApprovalBg}"
+                            BorderBrush="{StaticResource OrbitApprovalBorder}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="14,12"
+                            HorizontalAlignment="Left"
+                            MaxWidth="640"
+                            Margin="0,4,80,4">
+                      <StackPanel Spacing="8">
+                        <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="#9A7B1A" Text="{Binding ApprovalStatusLabel}" />
+                        <SelectableTextBlock Text="{Binding ApprovalText}" FontWeight="SemiBold" TextWrapping="Wrap" SelectionBrush="#402196F3" />
+                        <TextBlock Text="{Binding SuggestedAction}"
+                                   Foreground="{StaticResource OrbitMuted}"
+                                   TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowDecisionButtons}">
+                          <Button Classes="primary" Content="{Binding ApproveLabel}" Tag="{Binding EntryId}" Click="ApproveButton_OnClick" />
+                          <Button Content="{Binding RejectLabel}" Tag="{Binding EntryId}" Click="RejectButton_OnClick" />
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
+
+                    <Border IsVisible="{Binding IsFailedApproval}"
+                            Background="#FFF5F5"
+                            BorderBrush="#E8A0A0"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="14,12"
+                            HorizontalAlignment="Left"
+                            MaxWidth="640"
+                            Margin="0,4,80,4">
+                      <StackPanel Spacing="8">
+                        <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="#B42318" Text="{Binding ApprovalStatusLabel}" />
+                        <TextBlock Text="{Binding ApprovalText}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding FailMessage}"
+                                   Foreground="{StaticResource OrbitMuted}"
+                                   TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowDecisionButtons}">
+                          <Button Classes="primary" Content="{Binding RetryLabel}" Tag="{Binding EntryId}" Click="RetryButton_OnClick" />
+                          <Button Content="{Binding RejectLabel}" Tag="{Binding EntryId}" Click="RejectButton_OnClick" />
+                        </StackPanel>
+                      </StackPanel>
+                    </Border>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+
+          <!-- Trajectory: list + detail (DeepSeek-style ledger) -->
+          <Grid x:Name="TrajectoryHost"
+                IsVisible="False"
+                ColumnDefinitions="*,8,248"
+                Margin="0"
+                Background="Transparent">
+            <DockPanel Grid.Column="0" Margin="16,10,8,10">
+              <Border DockPanel.Dock="Top"
+                      Height="10"
+                      CornerRadius="5"
+                      ClipToBounds="True"
+                      Background="{StaticResource OrbitGlassSoft}"
+                      Margin="0,0,0,8"
+                      Padding="1">
+                <Grid x:Name="TrajectoryTimelineBar" Height="8" />
+              </Border>
+              <TextBlock x:Name="TrajectoryEmptyText"
+                         DockPanel.Dock="Top"
+                         IsVisible="False"
+                         FontSize="12"
+                         Foreground="{StaticResource OrbitMuted}"
+                         Margin="4,8"
+                         Text="No trajectory events" />
+              <ListBox x:Name="TrajectoryList"
+                       Classes="trajectory"
+                       SelectionChanged="TrajectoryList_OnSelectionChanged"
+                       Background="Transparent"
+                       BorderThickness="0">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="vm:TrajectoryRecordVm">
+                    <Grid ColumnDefinitions="Auto,*,Auto" MinHeight="36" Margin="2,1">
+                      <Border Background="{Binding SoftBrush}"
+                              CornerRadius="5"
+                              Padding="7,3"
+                              VerticalAlignment="Center"
+                              Margin="0,0,10,0">
+                        <TextBlock Text="{Binding KindLabel}"
+                                   FontSize="11"
+                                   FontWeight="SemiBold"
+                                   Foreground="{Binding KindBrush}" />
+                      </Border>
+                      <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Title}"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Subtitle}"
+                                   FontSize="11.5"
+                                   Foreground="{StaticResource OrbitMuted}"
+                                   TextTrimming="CharacterEllipsis"
+                                   FontFamily="Cascadia Mono, Consolas, monospace" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="2"
+                                 Text="{Binding DurationLabel}"
+                                 FontSize="11"
+                                 Foreground="{StaticResource OrbitSubtle}"
+                                 VerticalAlignment="Center"
+                                 Margin="10,0,4,0"
+                                 FontFamily="Cascadia Mono, Consolas, monospace" />
+                    </Grid>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </DockPanel>
+
+            <GridSplitter Grid.Column="1"
+                          Classes="orbit-split"
+                          ResizeDirection="Columns" />
+
+            <Border Grid.Column="2"
+                    Background="{StaticResource OrbitGlassSoft}"
+                    BorderBrush="{StaticResource OrbitGlassStrokeSoft}"
+                    BorderThickness="1,0,0,0"
+                    Padding="12,10">
+              <DockPanel>
+                <TextBlock x:Name="TraceDetailPlaceholder"
+                           DockPanel.Dock="Top"
+                           FontSize="12"
+                           Foreground="{StaticResource OrbitMuted}"
+                           TextWrapping="Wrap"
+                           Text="Select an event for details"
+                           VerticalAlignment="Center"
+                           HorizontalAlignment="Center"
+                           Margin="8,24" />
+                <TabControl x:Name="TraceDetailTabs" IsVisible="False" Classes="trace-detail">
+                  <TabItem x:Name="TraceTabOverview" Header="概述">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,6,0,0">
+                      <StackPanel Spacing="6">
+                        <StackPanel Spacing="2">
+                          <TextBlock x:Name="TraceLabelLevel" FontSize="10" Foreground="{StaticResource OrbitSubtle}" Text="Level" />
+                          <SelectableTextBlock x:Name="TraceOverviewLevel" FontSize="12.5" FontWeight="SemiBold" TextWrapping="Wrap" Text="—" SelectionBrush="#402196F3" />
+                        </StackPanel>
+                        <StackPanel Spacing="2">
+                          <TextBlock x:Name="TraceLabelStatus" FontSize="10" Foreground="{StaticResource OrbitSubtle}" Text="Status" />
+                          <SelectableTextBlock x:Name="TraceOverviewStatus" FontSize="12.5" TextWrapping="Wrap" Text="—" SelectionBrush="#402196F3" />
+                        </StackPanel>
+                      </StackPanel>
+                    </ScrollViewer>
+                  </TabItem>
+                  <TabItem x:Name="TraceTabParameters" Header="参数">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,6,0,0">
+                      <SelectableTextBlock x:Name="TraceParametersText"
+                                           FontFamily="Cascadia Mono, Consolas, monospace"
+                                           FontSize="11"
+                                           TextWrapping="Wrap"
+                                           Text="—"
+                                           SelectionBrush="#402196F3" />
+                    </ScrollViewer>
+                  </TabItem>
+                  <TabItem x:Name="TraceTabResult" Header="结果">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,6,0,0">
+                      <SelectableTextBlock x:Name="TraceResultText"
+                                           FontFamily="Cascadia Mono, Consolas, monospace"
+                                           FontSize="11"
+                                           TextWrapping="Wrap"
+                                           Text="—"
+                                           SelectionBrush="#402196F3" />
+                    </ScrollViewer>
+                  </TabItem>
+                  <TabItem x:Name="TraceTabSchema" Header="Schema">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,6,0,0">
+                      <SelectableTextBlock x:Name="TraceSchemaText"
+                                           FontFamily="Cascadia Mono, Consolas, monospace"
+                                           FontSize="11"
+                                           TextWrapping="Wrap"
+                                           Text="—"
+                                           SelectionBrush="#402196F3" />
+                    </ScrollViewer>
+                  </TabItem>
+                  <TabItem x:Name="TraceTabTiming" Header="计时">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,6,0,0">
+                      <SelectableTextBlock x:Name="TraceTimingText"
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Text="—"
+                                           SelectionBrush="#402196F3" />
+                    </ScrollViewer>
+                  </TabItem>
+                </TabControl>
+              </DockPanel>
+            </Border>
+          </Grid>
+        </Grid>
+
+        <!-- Composer：Row0=执行中条，Row1=弹出层，Row2=输入卡 -->
+        <Border Grid.Row="2"
+                Padding="22,8,22,16"
+                Background="Transparent"
+                ClipToBounds="False">
+          <Grid RowDefinitions="Auto,Auto,Auto" ClipToBounds="False">
+            <!-- Long runs: bar + elapsed — always visible above composer while Agent works. -->
+            <Border x:Name="RunBusyBanner"
+                    Grid.Row="0"
+                    Classes="run-busy-banner"
+                    IsVisible="False"
+                    Margin="0,0,0,10"
+                    HorizontalAlignment="Stretch">
+              <Grid RowDefinitions="Auto,Auto" RowSpacing="6">
+                <Grid ColumnDefinitions="*,Auto">
+                  <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <TextBlock x:Name="RunBusySpinner"
+                               Classes="run-spin"
+                               Text="●"
+                               FontSize="12"
+                               Foreground="{StaticResource OrbitInk}"
+                               VerticalAlignment="Center" />
+                    <TextBlock x:Name="RunBusyLabel"
+                               Text="Running…"
+                               FontSize="12.5"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource OrbitInk}"
+                               VerticalAlignment="Center" />
+                    <TextBlock x:Name="RunBusyDots"
+                               Text=""
+                               FontSize="12.5"
+                               Foreground="{StaticResource OrbitInk}"
+                               VerticalAlignment="Center"
+                               Width="18" />
+                  </StackPanel>
+                  <TextBlock x:Name="RunBusyElapsed"
+                             Grid.Column="1"
+                             Text=""
+                             FontSize="11"
+                             Foreground="{StaticResource OrbitMuted}"
+                             VerticalAlignment="Center" />
+                </Grid>
+                <ProgressBar Grid.Row="1"
+                             Height="3"
+                             IsIndeterminate="True"
+                             Foreground="{StaticResource OrbitInk}"
+                             Background="{StaticResource OrbitGlassSoft}" />
+              </Grid>
+            </Border>
+
+            <Panel Grid.Row="1" ClipToBounds="False" ZIndex="40">
+              <Border x:Name="UsagePanel"
+                      IsVisible="False"
+                      HorizontalAlignment="Right"
+                      VerticalAlignment="Bottom"
+                      Margin="0,0,0,8"
+                      Classes="glass-panel"
+                      Padding="16,14"
+                      MinWidth="320"
+                      MaxWidth="420">
+                <StackPanel Spacing="12">
+                  <DockPanel LastChildFill="True">
+                    <Button x:Name="UsagePanelCloseButton"
+                            DockPanel.Dock="Right"
+                            Classes="composer-icon"
+                            Content="—"
+                            ToolTip.Tip="Collapse"
+                            Click="UsagePanelClose_OnClick" />
+                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                      <TextBlock x:Name="UsagePanelTitle" Text="Context window" FontSize="13" FontWeight="SemiBold" />
+                      <TextBlock x:Name="UsagePanelSource"
+                                 Text="· provider usage"
+                                 FontSize="12"
+                                 Foreground="{StaticResource OrbitSubtle}"
+                                 VerticalAlignment="Center" />
+                    </StackPanel>
+                  </DockPanel>
+                  <StackPanel Spacing="4">
+                    <TextBlock x:Name="UsagePanelPercent" FontSize="20" FontWeight="SemiBold" Text="0%" />
+                    <TextBlock x:Name="UsagePanelSubtitle"
+                               FontSize="12"
+                               Foreground="{StaticResource OrbitMuted}"
+                               TextWrapping="Wrap"
+                               Text="Last request occupancy / window" />
+                    <TextBlock x:Name="UsagePanelTokens"
+                               FontSize="12"
+                               Foreground="{StaticResource OrbitMuted}"
+                               TextWrapping="Wrap"
+                               Text="" />
+                    <TextBlock x:Name="UsagePanelHint"
+                               FontSize="11"
+                               Foreground="{StaticResource OrbitSubtle}"
+                               TextWrapping="Wrap"
+                               Text="Percent = last input ÷ window. Lifetime sums turns and can exceed the window." />
+                  </StackPanel>
+                  <Border Height="10" CornerRadius="5" ClipToBounds="True" Background="{StaticResource OrbitGlassSoft}">
+                    <Grid x:Name="UsagePanelBar" Height="10" />
+                  </Border>
+                  <ItemsControl x:Name="UsageBreakdownList">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:ContextUsageRowVm">
+                        <DockPanel Margin="0,5" LastChildFill="True">
+                          <Border DockPanel.Dock="Left"
+                                  Width="10" Height="10"
+                                  CornerRadius="2"
+                                  Margin="0,0,10,0"
+                                  VerticalAlignment="Center"
+                                  Background="{Binding ColorBrush}" />
+                          <TextBlock DockPanel.Dock="Right"
+                                     Text="{Binding TokensText}"
+                                     FontSize="12"
+                                     Foreground="{StaticResource OrbitMuted}"
+                                     Margin="12,0,0,0"
+                                     VerticalAlignment="Center" />
+                          <TextBlock Text="{Binding Label}" FontSize="13" VerticalAlignment="Center" />
+                        </DockPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+              </Border>
+            </Panel>
+
+            <Border Grid.Row="2"
+                    Classes="glass-composer"
+                    Padding="14,10,12,10"
+                    MinHeight="72"
+                    HorizontalAlignment="Stretch">
+              <Grid RowDefinitions="*,Auto">
+                <TextBox x:Name="MessageBox"
+                         Classes="composer"
+                         Grid.Row="0"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         MinHeight="28"
+                         MaxHeight="140"
+                         FontSize="14"
+                         FocusAdorner="{x:Null}"
+                         PlaceholderText="Message the agent…"
+                         TextChanged="MessageBox_OnTextChanged"
+                         KeyDown="MessageBox_OnKeyDown" />
+                <Grid Grid.Row="1" Margin="0,8,0,0" ColumnDefinitions="Auto,*,Auto">
+                  <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                    <Button x:Name="ComposerPlusButton"
+                            Classes="composer-icon"
+                            Content="+"
+                            VerticalAlignment="Center"
+                            ToolTip.Tip="Upload attachment"
+                            Click="ComposerPlusButton_OnClick" />
+                    <ComboBox x:Name="ModelBox"
+                              Classes="composer-model"
+                              MinWidth="120"
+                              MaxWidth="200"
+                              Height="28"
+                              VerticalAlignment="Center"
+                              VerticalContentAlignment="Center"
+                              IsEditable="True"
+                              SelectionChanged="ModelBox_OnSelectionChanged" />
+                    <CheckBox x:Name="ReasoningToggle"
+                              FontSize="11"
+                              Content="Reason"
+                              VerticalAlignment="Center"
+                              ToolTip.Tip="Enable model reasoning / thinking"
+                              IsCheckedChanged="ReasoningToggle_OnIsCheckedChanged" />
+                    <ComboBox x:Name="ReasoningEffortBox"
+                              MinWidth="88"
+                              MaxWidth="120"
+                              Height="28"
+                              FontSize="11"
+                              VerticalAlignment="Center"
+                              VerticalContentAlignment="Center"
+                              ToolTip.Tip="Reasoning effort"
+                              SelectionChanged="ReasoningEffortBox_OnSelectionChanged" />
+                  </StackPanel>
+
+                  <StackPanel Grid.Column="1"
+                              Orientation="Horizontal"
+                              Spacing="10"
+                              VerticalAlignment="Center"
+                              Margin="12,0"
+                              HorizontalAlignment="Left">
+                    <TextBlock x:Name="LlmStatusText"
+                               VerticalAlignment="Center"
+                               FontSize="11"
+                               Foreground="{StaticResource OrbitSubtle}"
+                               Text=""
+                               IsVisible="False" />
+                    <TextBlock x:Name="StatusText"
+                               VerticalAlignment="Center"
+                               FontSize="11"
+                               Foreground="{StaticResource OrbitSubtle}"
+                               Text="Ready"
+                               TextTrimming="CharacterEllipsis" />
+                  </StackPanel>
+
+                  <StackPanel Grid.Column="2"
+                              Orientation="Horizontal"
+                              Spacing="8"
+                              VerticalAlignment="Center">
+                    <Button x:Name="UsageStripButton"
+                            Classes="ghost"
+                            Padding="8,4"
+                            CornerRadius="8"
+                            Click="UsageStrip_OnClick"
+                            ToolTip.Tip="Context usage">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Border Width="56" Height="5" CornerRadius="3" ClipToBounds="True"
+                                Background="{StaticResource OrbitGlassSoft}"
+                                VerticalAlignment="Center">
+                          <Grid x:Name="UsageStripBar" Height="5" />
+                        </Border>
+                        <TextBlock x:Name="UsageStripText"
+                                   FontSize="11"
+                                   Foreground="{StaticResource OrbitMuted}"
+                                   VerticalAlignment="Center"
+                                   Text="0% · ~0 / 128K" />
+                      </StackPanel>
+                    </Button>
+                    <Button x:Name="SendButton"
+                            Classes="composer-send"
+                            Content="↑"
+                            ToolTip.Tip="Send · Enter (Shift+Enter for newline)"
+                            Click="SendButton_OnClick" />
+                  </StackPanel>
+                </Grid>
+              </Grid>
+            </Border>
+          </Grid>
+        </Border>
+      </Grid>
+      </Border>
+
+      <GridSplitter Grid.Column="3"
+                    Classes="orbit-split"
+                    ResizeDirection="Columns" />
+
+      <!-- ===== Right: Agent capabilities ===== -->
+      <Border Grid.Column="4"
+              MinWidth="240"
+              Classes="glass-panel"
+              Padding="12,12">
+        <DockPanel>
+          <DockPanel DockPanel.Dock="Top" Margin="2,0,2,10" LastChildFill="True">
+            <Button x:Name="ToolsRefreshButton"
+                    DockPanel.Dock="Right"
+                    Classes="ghost"
+                    Content="↻"
+                    Padding="6,2"
+                    Margin="6,0,0,0"
+                    VerticalAlignment="Center"
+                    Click="CapabilitiesRefresh_OnClick" />
+            <StackPanel Spacing="2">
+              <TextBlock x:Name="CapabilitiesTitle" Text="Agent capabilities" FontSize="13" FontWeight="SemiBold" />
+              <TextBlock x:Name="CapabilitiesStatusText"
+                         FontSize="11"
+                         Foreground="{StaticResource OrbitMuted}"
+                         TextWrapping="Wrap"
+                         IsVisible="False"
+                         Text="" />
+              <TextBlock x:Name="CapabilitiesAppliedHint"
+                         FontSize="11"
+                         Foreground="{StaticResource OrbitMuted}"
+                         TextWrapping="Wrap"
+                         IsVisible="False"
+                         Text="" />
+            </StackPanel>
+          </DockPanel>
+
+          <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="8">
+              <!-- Compact status card -->
+              <Border Classes="glass-chip" Padding="10,8">
+                <StackPanel Spacing="6">
+                  <Grid ColumnDefinitions="Auto,*">
+                    <TextBlock x:Name="LabelCurrentAgent"
+                               Text="Agent"
+                               FontSize="10"
+                               Foreground="{StaticResource OrbitSubtle}"
+                               Width="56"
+                               VerticalAlignment="Top" />
+                    <TextBlock x:Name="ContextAgentText"
+                               Grid.Column="1"
+                               FontSize="12"
+                               TextWrapping="Wrap"
+                               Text="—" />
+                  </Grid>
+                  <Grid ColumnDefinitions="Auto,*">
+                    <TextBlock x:Name="LabelModel"
+                               Text="Model"
+                               FontSize="10"
+                               Foreground="{StaticResource OrbitSubtle}"
+                               Width="56"
+                               VerticalAlignment="Top" />
+                    <StackPanel Grid.Column="1" Spacing="2">
+                      <TextBlock x:Name="ContextLlmText" TextWrapping="Wrap" FontSize="12" Text="—" />
+                      <TextBlock x:Name="ModelRestartHint"
+                                 FontSize="10"
+                                 Foreground="{StaticResource OrbitMuted}"
+                                 IsVisible="False"
+                                 Text="" />
+                    </StackPanel>
+                  </Grid>
+                  <Grid ColumnDefinitions="Auto,*">
+                    <TextBlock x:Name="LabelReasoning"
+                               Text="Reason"
+                               FontSize="10"
+                               Foreground="{StaticResource OrbitSubtle}"
+                               Width="56"
+                               VerticalAlignment="Center" />
+                    <TextBlock x:Name="ContextReasoningText"
+                               Grid.Column="1"
+                               FontSize="12"
+                               Text="—" />
+                  </Grid>
+                  <Grid ColumnDefinitions="Auto,*">
+                    <TextBlock x:Name="LabelApprovals"
+                               Text="Approvals"
+                               FontSize="10"
+                               Foreground="{StaticResource OrbitSubtle}"
+                               Width="56"
+                               VerticalAlignment="Center" />
+                    <TextBlock x:Name="ContextPendingText"
+                               Grid.Column="1"
+                               FontSize="12"
+                               Text="None" />
+                  </Grid>
+                </StackPanel>
+              </Border>
+
+              <Expander x:Name="HarnessSection"
+                        Classes="cap-section"
+                        IsExpanded="False"
+                        HorizontalAlignment="Stretch">
+                <Expander.Header>
+                  <TextBlock x:Name="LabelHarness"
+                             Text="Harness"
+                             FontSize="11"
+                             FontWeight="SemiBold"
+                             Foreground="{StaticResource OrbitSubtle}" />
+                </Expander.Header>
+                <StackPanel Spacing="6" Margin="2,4,0,0">
+                  <TextBlock x:Name="HarnessStyleText"
+                             FontSize="11"
+                             Foreground="{StaticResource OrbitMuted}"
+                             TextWrapping="Wrap"
+                             Text="Load an Agent to inspect Harness" />
+                  <StackPanel x:Name="HarnessModulesPanel" Spacing="6" />
+                </StackPanel>
+              </Expander>
+
+              <Expander x:Name="ToolsSection"
+                        Classes="cap-section"
+                        IsExpanded="True"
+                        HorizontalAlignment="Stretch">
+                <Expander.Header>
+                  <TextBlock x:Name="LabelDomainTools"
+                             Text="Tools (0)"
+                             FontSize="11"
+                             FontWeight="SemiBold"
+                             Foreground="{StaticResource OrbitSubtle}" />
+                </Expander.Header>
+                <ScrollViewer MaxHeight="280"
+                              Margin="0,4,0,0"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                  <StackPanel x:Name="ToolsListPanel" Spacing="0" />
+                </ScrollViewer>
+              </Expander>
+              <!-- Legacy plain-text slot (UiText / usage estimator); kept hidden. -->
+              <TextBlock x:Name="ContextToolsText" IsVisible="False" Text="—" />
+
+              <DockPanel LastChildFill="True">
+                <Button x:Name="SkillsRefreshButton"
+                        DockPanel.Dock="Right"
+                        Classes="ghost"
+                        Content="↻"
+                        Padding="6,2"
+                        Margin="4,0,0,0"
+                        VerticalAlignment="Top"
+                        Click="CapabilitiesRefresh_OnClick" />
+                <Expander x:Name="SkillsSection"
+                          Classes="cap-section"
+                          IsExpanded="False"
+                          HorizontalAlignment="Stretch">
+                  <Expander.Header>
+                    <TextBlock x:Name="LabelSkills"
+                               Text="Skills (0)"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource OrbitSubtle}" />
+                  </Expander.Header>
+                  <ScrollViewer MaxHeight="180"
+                                Margin="0,4,0,0"
+                                VerticalScrollBarVisibility="Auto"
+                                HorizontalScrollBarVisibility="Disabled">
+                    <StackPanel x:Name="SkillsListPanel" Spacing="0" />
+                  </ScrollViewer>
+                </Expander>
+              </DockPanel>
+              <TextBlock x:Name="ContextSkillsText" IsVisible="False" Text="—" />
+
+              <DockPanel LastChildFill="True">
+                <StackPanel DockPanel.Dock="Right"
+                            Orientation="Horizontal"
+                            Spacing="2"
+                            VerticalAlignment="Top"
+                            Margin="4,0,0,0">
+                  <Button x:Name="McpAddButton"
+                          Classes="ghost"
+                          Content="+ Add"
+                          Padding="6,2"
+                          Click="McpAddButton_OnClick" />
+                  <Button x:Name="McpRefreshButton"
+                          Classes="ghost"
+                          Content="↻"
+                          Padding="6,2"
+                          Click="CapabilitiesRefresh_OnClick" />
+                </StackPanel>
+                <Expander x:Name="McpSection"
+                          Classes="cap-section"
+                          IsExpanded="False"
+                          HorizontalAlignment="Stretch">
+                  <Expander.Header>
+                    <TextBlock x:Name="LabelMcp"
+                               Text="MCP (0)"
+                               FontSize="11"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource OrbitSubtle}" />
+                  </Expander.Header>
+                  <StackPanel Spacing="6" Margin="0,4,0,0">
+                    <TextBlock x:Name="McpPlaceholderText"
+                               FontSize="11"
+                               Foreground="{StaticResource OrbitMuted}"
+                               Text="Not configured" />
+                    <StackPanel x:Name="McpListPanel" Spacing="0" />
+                    <TextBlock x:Name="McpRestartHint"
+                               FontSize="10"
+                               Foreground="{StaticResource OrbitMuted}"
+                               IsVisible="False"
+                               Text="" />
+                    <StackPanel x:Name="McpRestartBar"
+                                Orientation="Horizontal"
+                                Spacing="8"
+                                IsVisible="False">
+                      <TextBlock x:Name="McpRestartBarText"
+                                 FontSize="11"
+                                 Foreground="{StaticResource OrbitMuted}"
+                                 VerticalAlignment="Center"
+                                 TextWrapping="Wrap"
+                                 MaxWidth="180" />
+                      <Button x:Name="McpRestartNowButton"
+                              Classes="primary"
+                              Content="Restart now"
+                              Padding="8,2"
+                              Click="McpRestartNowButton_OnClick" />
+                    </StackPanel>
+                  </StackPanel>
+                </Expander>
+              </DockPanel>
+
+              <!-- Kept for code-behind (status sync / harness); not shown in the left footer. -->
+              <TextBlock x:Name="RuntimeStatusText" IsVisible="False" />
+              <TextBlock x:Name="ContextRuntimeText" IsVisible="False" />
+              <TextBlock x:Name="ContextBrowserText" IsVisible="False" />
+              <TextBlock x:Name="ContextHintText" IsVisible="False" />
+              <Border x:Name="LlmBadge" IsVisible="False" />
+            </StackPanel>
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+    </Grid>
+
+    <!-- Settings overlay -->
+    <Grid x:Name="SettingsOverlay" IsVisible="False" ZIndex="100">
+      <Border Background="#4D1A2330" PointerPressed="SettingsDim_OnPointerPressed" />
+      <Border Width="520"
+              HorizontalAlignment="Right"
+              Margin="0,10,10,10"
+              Classes="glass-panel"
+              Padding="22">
+        <DockPanel>
+          <Grid DockPanel.Dock="Top" Margin="0,0,0,16" ColumnDefinitions="*,Auto">
+            <TextBlock x:Name="SettingsTitle"
+                       Text="Settings · LLM"
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       VerticalAlignment="Center" />
+            <Button x:Name="CloseSettingsButton" Grid.Column="1" Content="Close" Click="CloseSettingsButton_OnClick" />
+          </Grid>
+
+          <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,16,0,0">
+            <Button x:Name="CancelSettingsButton" Content="Cancel" Click="CloseSettingsButton_OnClick" />
+            <Button x:Name="SaveSettingsButton" Classes="primary" Content="Save &amp; apply" Click="SaveSettingsButton_OnClick" />
+          </StackPanel>
+
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="12">
+              <TextBlock x:Name="SettingsEnvHint"
+                         Text="Endpoint and API Key are written to the current user environment variables only — never to the repo."
+                         TextWrapping="Wrap"
+                         Foreground="{StaticResource OrbitMuted}"
+                         FontSize="12" />
+
+              <Button x:Name="OpenLogsButton"
+                      Content="Open Runtime logs folder"
+                      HorizontalAlignment="Left"
+                      Click="OpenLogsButton_OnClick" />
+
+              <TextBlock x:Name="LabelLanguage" Text="Language" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource OrbitMuted}" />
+              <ComboBox x:Name="SettingsLanguageBox" HorizontalAlignment="Stretch" />
+
+              <TextBlock x:Name="LabelProvider" Text="Provider" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource OrbitMuted}" />
+              <ComboBox x:Name="SettingsProfileBox"
+                        SelectionChanged="SettingsProfileBox_OnSelectionChanged"
+                        HorizontalAlignment="Stretch" />
+
+              <TextBlock x:Name="LabelProtocol" Text="Protocol" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource OrbitMuted}" />
+              <ComboBox x:Name="SettingsProtocolBox" HorizontalAlignment="Stretch" IsEnabled="False">
+                <ComboBoxItem Content="OpenAI Responses" IsSelected="True" />
+                <ComboBoxItem Content="Anthropic Messages (later)" IsEnabled="False" />
+              </ComboBox>
+
+              <TextBlock x:Name="LabelEndpoint" Text="Endpoint" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource OrbitMuted}" />
+              <TextBox x:Name="SettingsEndpointBox" PlaceholderText="https://api.deepseek.com" />
+
+              <TextBlock x:Name="LabelApiKey" Text="API Key" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource OrbitMuted}" />
+              <TextBox x:Name="SettingsApiKeyBox"
+                       PasswordChar="•"
+                       PlaceholderText="Leave blank to keep; type to overwrite" />
+
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button x:Name="SettingsRefreshModelsButton" Content="Fetch models" Click="SettingsRefreshModelsButton_OnClick" />
+                <TextBlock x:Name="SettingsModelsHint"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           Foreground="{StaticResource OrbitMuted}" />
+              </StackPanel>
+
+              <TextBlock x:Name="LabelDefaultModel" Text="Default model" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource OrbitMuted}" />
+              <ComboBox x:Name="SettingsModelBox" HorizontalAlignment="Stretch" IsEditable="True" />
+
+              <TextBlock x:Name="SettingsStatusText"
+                         TextWrapping="Wrap"
+                         FontSize="12"
+                         Foreground="{StaticResource OrbitMuted}" />
+            </StackPanel>
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+    </Grid>
+
+    <!-- MCP Add Server overlay (same dim style as Settings) -->
+    <Grid x:Name="McpOverlay" IsVisible="False" ZIndex="110">
+      <Border Background="#4D1A2330" PointerPressed="McpDim_OnPointerPressed" />
+      <Border Width="480"
+              HorizontalAlignment="Right"
+              Margin="0,10,10,10"
+              Classes="glass-panel"
+              Padding="22">
+        <DockPanel>
+          <Grid DockPanel.Dock="Top" Margin="0,0,0,16" ColumnDefinitions="*,Auto">
+            <TextBlock x:Name="McpOverlayTitle"
+                       Text="Add MCP server"
+                       FontSize="18"
+                       FontWeight="SemiBold"
+                       VerticalAlignment="Center" />
+            <Button x:Name="CloseMcpOverlayButton" Grid.Column="1" Content="Close" Click="CloseMcpOverlayButton_OnClick" />
+          </Grid>
+
+          <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,16,0,0">
+            <Button x:Name="CancelMcpOverlayButton" Content="Cancel" Click="CloseMcpOverlayButton_OnClick" />
+            <Button x:Name="SaveMcpOverlayButton" Classes="primary" Content="Save" Click="SaveMcpOverlayButton_OnClick" />
+          </StackPanel>
+
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="12">
+              <TextBlock x:Name="McpOverlayHint"
+                         Text="Changes are saved to disk; restart the agent to connect. Hot-swap is not available."
+                         TextWrapping="Wrap"
+                         Foreground="{StaticResource OrbitMuted}"
+                         FontSize="12" />
+
+              <TextBlock x:Name="LabelMcpId" Text="Id" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource OrbitMuted}" />
+              <TextBox x:Name="McpIdBox" PlaceholderText="tavily" />
+
+              <TextBlock x:Name="LabelMcpTransport" Text="Transport" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource OrbitMuted}" />
+              <ComboBox x:Name="McpTransportBox" HorizontalAlignment="Stretch" SelectionChanged="McpTransportBox_OnSelectionChanged">
+                <ComboBoxItem Content="stdio" Tag="stdio" IsSelected="True" />
+                <ComboBoxItem Content="http" Tag="http" />
+              </ComboBox>
+
+              <StackPanel x:Name="McpStdioFields" Spacing="12">
+                <TextBlock x:Name="LabelMcpCommand" Text="Command" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource OrbitMuted}" />
+                <TextBox x:Name="McpCommandBox" PlaceholderText="npx" />
+                <TextBlock x:Name="LabelMcpArgs" Text="Args (one per line)" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource OrbitMuted}" />
+                <TextBox x:Name="McpArgsBox"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         MinHeight="64"
+                         PlaceholderText="-y&#x0a;tavily-mcp" />
+              </StackPanel>
+
+              <StackPanel x:Name="McpHttpFields" Spacing="12" IsVisible="False">
+                <TextBlock x:Name="LabelMcpUrl" Text="URL (https)" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource OrbitMuted}" />
+                <TextBox x:Name="McpUrlBox" PlaceholderText="https://mcp.tavily.com/mcp" />
+                <TextBlock x:Name="LabelMcpHeaders" Text="Headers (key=value per line)" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource OrbitMuted}" />
+                <TextBox x:Name="McpHeadersBox"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         MinHeight="64"
+                         PlaceholderText="Authorization=Bearer ${TAVILY_API_KEY}" />
+              </StackPanel>
+
+              <TextBlock x:Name="LabelMcpEnv" Text="Env (key=value per line)" FontWeight="SemiBold" FontSize="12" Foreground="{StaticResource OrbitMuted}" />
+              <TextBox x:Name="McpEnvBox"
+                       AcceptsReturn="True"
+                       TextWrapping="Wrap"
+                       MinHeight="64"
+                       PlaceholderText="TAVILY_API_KEY=${TAVILY_API_KEY}" />
+
+              <CheckBox x:Name="McpTrustedCheck" Content="Trusted (required to connect)" IsChecked="False" />
+              <CheckBox x:Name="McpEnabledCheck" Content="Enabled" IsChecked="True" />
+              <CheckBox x:Name="McpRequiresApprovalCheck" Content="Require approval before each tool call" IsChecked="False" />
+
+              <TextBlock x:Name="McpOverlayStatusText"
+                         TextWrapping="Wrap"
+                         FontSize="12"
+                         Foreground="{StaticResource OrbitMuted}" />
+            </StackPanel>
+          </ScrollViewer>
+        </DockPanel>
+      </Border>
+    </Grid>
+  </Grid>
+  </ExperimentalAcrylicBorder>
+</Window>

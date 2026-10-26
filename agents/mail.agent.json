@@ -1,0 +1,11 @@
+{
+  "id": "mail",
+  "displayName": "Mail Assistant",
+  "description": "Outlook Web login → inbox list → triage; archive needs HITL; never auto-delete.",
+  "project": "src/Orbit.Agents.Mail/Orbit.Agents.Mail.csproj",
+  "capabilities": ["mail.login", "mail.inbox.list", "mail.triage", "mail.archive.hitl", "mail.file_memory", "skills"],
+  "loginUrl": "https://outlook.live.com/mail/",
+  "protocol": "ag-ui",
+  "workspace": "none",
+  "harness": ["mode", "todo", "file_memory", "skills", "compaction", "tool_approval"]
+}

@@ -1,0 +1,19 @@
+{
+  "servers": [
+    {
+      "id": "tavily",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "tavily-mcp@0.2.1"],
+      "env": {
+        "TAVILY_API_KEY": "${TAVILY_API_KEY}"
+      },
+      "enabled": true,
+      "trusted": true,
+      "toolPrefix": "",
+      "timeoutSeconds": 60,
+      "requiresApproval": false,
+      "approvalTools": []
+    }
+  ]
+}

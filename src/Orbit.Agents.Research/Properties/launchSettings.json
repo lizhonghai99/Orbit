@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "Orbit.Agents.Research": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:58303;http://localhost:58304"
+    }
+  }
+}

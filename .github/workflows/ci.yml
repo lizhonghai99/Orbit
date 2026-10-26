@@ -1,0 +1,42 @@
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Restore
+        # Configuration explicitly matches Build so a config-conditional package can never
+        # produce a project.assets.json that breaks the other configuration.
+        run: dotnet restore Orbit.slnx -p:Configuration=Release --nologo
+      - name: Build (warnings as errors via Directory.Build.props)
+        run: dotnet build Orbit.slnx -c Release --no-restore --nologo
+      - name: Test + coverage
+        # MTP (global.json) — Microsoft.Testing.Extensions.CodeCoverage, not VSTest --collect.
+        # Default writes unique *.cobertura.xml under each project's TestResults/ (parallel-safe).
+        run: >
+          dotnet test Orbit.slnx -c Release --no-build --nologo
+          --coverage
+          --coverage-output-format cobertura
+      - name: Test again (order / env flake catch)
+        # Second pass without coverage — cheap (~10s) net for ordering / ORBIT_* isolation regressions
+        # that a single green run can miss. xunit collections only cover known env mutators.
+        run: dotnet test Orbit.slnx -c Release --no-build --nologo
+      - name: Format verify
+        # Fail the job when committed code drifts from `dotnet format` (SDK style / analyzers).
+        run: dotnet format Orbit.slnx --verify-no-changes --no-restore --severity warn
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: "**/TestResults/**/*.cobertura.xml"
+          if-no-files-found: ignore

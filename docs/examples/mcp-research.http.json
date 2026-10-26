@@ -1,0 +1,17 @@
+{
+  "servers": [
+    {
+      "id": "tavily",
+      "transport": "http",
+      "url": "https://mcp.tavily.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${TAVILY_API_KEY}"
+      },
+      "enabled": true,
+      "trusted": true,
+      "toolPrefix": "",
+      "timeoutSeconds": 30,
+      "requiresApproval": false
+    }
+  ]
+}

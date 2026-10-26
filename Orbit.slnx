@@ -1,0 +1,21 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Orbit.Agents.Hosting/Orbit.Agents.Hosting.csproj" />
+    <Project Path="src/Orbit.Agents.Browser/Orbit.Agents.Browser.csproj" />
+    <Project Path="src/Orbit.Agents.Mail/Orbit.Agents.Mail.csproj" />
+    <Project Path="src/Orbit.Agents.Research/Orbit.Agents.Research.csproj" />
+    <Project Path="src/Orbit.Agents.Coder/Orbit.Agents.Coder.csproj" />
+    <Project Path="src/Orbit.Contracts/Orbit.Contracts.csproj" />
+
+    <Project Path="src/Orbit.Runtime/Orbit.Runtime.csproj" />
+    <Project Path="src/Orbit.Shell/Orbit.Shell.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Orbit.Contracts.Tests/Orbit.Contracts.Tests.csproj" />
+    <Project Path="tests/Orbit.Agents.Hosting.Tests/Orbit.Agents.Hosting.Tests.csproj" />
+    <Project Path="tests/Orbit.Agents.Coder.Tests/Orbit.Agents.Coder.Tests.csproj" />
+    <Project Path="tests/Orbit.Runtime.Tests/Orbit.Runtime.Tests.csproj" />
+    <Project Path="tests/Orbit.Shell.Tests/Orbit.Shell.Tests.csproj" />
+  </Folder>
+</Solution>
+

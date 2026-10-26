@@ -1,0 +1,18 @@
+{
+  "id": "research",
+  "displayName": "Research Assistant",
+  "description": "BackgroundAgents (AngleResearcher concurrent) + Workflow Scope→Outline→Draft; FileMemory notes.",
+  "project": "src/Orbit.Agents.Research/Orbit.Agents.Research.csproj",
+  "capabilities": [
+    "background_agents",
+    "workflow.sequential",
+    "workflow.checkpoint",
+    "research.brief",
+    "file_access",
+    "file_memory",
+    "skills"
+  ],
+  "protocol": "ag-ui",
+  "workspace": "optional",
+  "harness": ["mode", "todo", "file_memory", "file_access", "skills", "background", "compaction", "tool_approval"]
+}

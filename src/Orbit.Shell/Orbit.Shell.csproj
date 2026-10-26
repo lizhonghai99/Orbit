@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\orbit.ico</ApplicationIcon>
+    <RootNamespace>Orbit.Shell</RootNamespace>
+    <AssemblyName>Orbit.Shell</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.4" />
+    <!-- Dev-only diagnostics bridge. Keep this reference unconditional: NuGet restore is
+         configuration-agnostic (one project.assets.json for all configurations), so conditioning
+         IncludeAssets on $(Configuration) silently breaks Debug builds after a Release restore
+         (CS1061 on WithDeveloperTools). The dev-tools call site is already guarded by #if DEBUG. -->
+    <PackageReference Include="AvaloniaUI.DiagnosticsSupport" Version="2.2.3" PrivateAssets="all" />
+    <PackageReference Include="Markdown.Avalonia" Version="12.0.2" />
+    <PackageReference Include="Serilog" Version="4.3.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orbit.Contracts\Orbit.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="I18n\strings.en.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="I18n\strings.zh.json" CopyToOutputDirectory="PreserveNewest" />
+    <AvaloniaResource Include="Assets\orbit.ico" />
+    <AvaloniaResource Include="Assets\orbit-32.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orbit.Shell.Tests" />
+  </ItemGroup>
+
+  <!-- Package stays unconditional for Debug restore; strip from publish output (~1.4MB). -->
+  <Target Name="ExcludeDiagnosticsSupportFromPublish" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="$([System.String]::Copy('%(Filename)%(Extension)').Contains('DiagnosticsSupport'))
+                                        Or $([System.String]::Copy('%(Filename)%(Extension)').Contains('Avalonia.Diagnostics'))" />
+    </ItemGroup>
+  </Target>
+</Project>

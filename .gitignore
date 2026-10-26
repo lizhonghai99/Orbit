@@ -1,0 +1,41 @@
+## .NET
+bin/
+obj/
+TestResults/
+**/TestResults/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa]rtifacts/
+*.nupkg
+project.lock.json
+project.fragment.lock.json
+
+## IDE
+.vs/
+.idea/
+*.swp
+*~
+
+## Secrets & local runtime
+.env
+.env.*
+!.env.example
+**/user-secrets.json
+**/appsettings.*.local.json
+data/
+
+## Playwright / browser profiles (login sessions)
+**/.playwright/
+**/browser-profiles/
+**/user-data-dir/
+
+## OS
+Thumbs.db
+Desktop.ini
+.DS_Store

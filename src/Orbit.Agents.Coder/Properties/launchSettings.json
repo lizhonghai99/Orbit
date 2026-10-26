@@ -1,0 +1,13 @@
+{
+  "profiles": {
+    "Orbit.Agents.Coder": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ORBIT_AGENT_ID": "coder"
+      },
+      "applicationUrl": "http://127.0.0.1:0"
+    }
+  }
+}

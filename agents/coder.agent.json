@@ -1,0 +1,10 @@
+{
+  "id": "coder",
+  "displayName": "Coding Assistant",
+  "description": "FileAccess + FileMemory + approved bash + todos/skills/compaction in the host workspace.",
+  "project": "src/Orbit.Agents.Coder/Orbit.Agents.Coder.csproj",
+  "capabilities": ["coder.file_access", "coder.file_memory", "coder.bash.hitl", "coder.plan", "skills"],
+  "protocol": "ag-ui",
+  "workspace": "required",
+  "harness": ["mode", "todo", "file_memory", "file_access", "skills", "compaction", "tool_approval"]
+}

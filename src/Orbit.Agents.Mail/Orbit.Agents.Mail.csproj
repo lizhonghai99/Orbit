@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orbit.Agents.Hosting\Orbit.Agents.Hosting.csproj" />
+    <ProjectReference Include="..\Orbit.Agents.Browser\Orbit.Agents.Browser.csproj" />
+    <ProjectReference Include="..\Orbit.Contracts\Orbit.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Agents.AI" Version="1.26.0" />
+    <PackageReference Include="Microsoft.Agents.AI.Hosting.AGUI.AspNetCore" Version="1.26.0-preview.261023.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="skills\**\*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orbit.Agents.Hosting.Tests" />
+  </ItemGroup>
+
+</Project>
