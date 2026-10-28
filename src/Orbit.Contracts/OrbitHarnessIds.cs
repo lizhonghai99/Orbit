@@ -16,9 +16,14 @@ public static class OrbitHarnessIds
     public const string ToolApproval = "tool_approval";
 
     /// <summary>
-    /// Default when manifest/env omit harness: core providers + pipeline rails.
-    /// Disk / Background still require explicit opt-in.
+    /// Default when manifest/env omit harness <b>or</b> list parses to empty:
+    /// core providers + pipeline rails. Disk / Background still require explicit opt-in.
     /// </summary>
+    /// <remarks>
+    /// Contrast with <c>AgentBootstrap.CreateAgent(harness: new HashSet())</c>:
+    /// an empty set passed in code means <b>enable nothing</b> (no default fill-in).
+    /// Manifest <c>"harness": []</c> goes through <see cref="Parse"/> and becomes <see cref="Default"/>.
+    /// </remarks>
     public static IReadOnlyList<string> Default { get; } =
         [Mode, Todo, Skills, Compaction, ToolApproval];
 

@@ -36,11 +36,11 @@ Default URL: `http://127.0.0.1:5050`.
 | `Orbit.Agents.Browser` | Shared Playwright pack (profiles only; no domain logic) |
 | `Orbit.Agents.Mail` | Outlook Web triage (HITL; never auto-delete) |
 | `Orbit.Agents.Research` | BackgroundAgents + Workflow Scope→Outline→Draft + checkpoints |
-| `Orbit.Agents.Coder` | FileAccess + FileMemory + approved Git Bash; host Workspace required |
+| `Orbit.Agents.Coder` | Short-Running / Long-Running (`coder_*` handoff + FeatureList); Workspace required |
 | `agents/*.json` | Static discovery (top-level only; `deferred/` not loaded) |
 | `data/` | Local sessions / profiles / MCP / workspaces (**gitignored**) |
 
-Tests: `Orbit.Contracts.Tests`, `Orbit.Agents.Hosting.Tests`, `Orbit.Agents.Coder.Tests`, `Orbit.Runtime.Tests`, `Orbit.Shell.Tests` (**327** passing as of this README).
+Tests: `Orbit.Contracts.Tests`, `Orbit.Agents.Hosting.Tests`, `Orbit.Agents.Coder.Tests`, `Orbit.Runtime.Tests`, `Orbit.Shell.Tests` (**378** passing as of this README; Coder includes handoff approval-resume contract tests).
 
 ### Skills (per agent)
 
@@ -93,7 +93,7 @@ This is a **first layer, not a sandbox**. **0.0.1 product stance:** open **trust
 | Agent | `harness` | Notes |
 |-------|-----------|--------|
 | Mail | `mode,todo,file_memory,skills,compaction,tool_approval` | No FileAccess; notes share mailbox registry root |
-| Coder | `mode,todo,file_memory,file_access,skills,compaction,tool_approval` | bash is agent-owned; notes ≠ repo files |
+| Coder | `mode,todo,file_memory,file_access,skills,compaction,tool_approval` | `coder_generator` implements; `coder_evaluator` PASS/FAIL QA |
 | Research | above + `background` | Full research stack |
 | (default if empty) | `mode,todo,skills,compaction,tool_approval` | Disk / Background still opt-in |
 
@@ -131,6 +131,26 @@ Browser profiles: `data/browser-profiles/{agentId}/{profileId}/` — see [docs/b
 ```powershell
 pwsh src/Orbit.Agents.Mail/bin/Debug/net10.0/playwright.ps1 install chromium
 ```
+
+## Coder (Short-Running / Long-Running)
+
+Externally one Coder. Internally two routes + four handoff ids:
+
+| Route | Chain |
+|-------|--------|
+| **Short-Running** | `coder_router` → `coder_generator` → `coder_evaluator` (HITL) |
+| **Long-Running** | `coder_router` → `coder_planner`; each batch `run_coding_turn` (**context reset**) |
+
+| Id | Role |
+|----|------|
+| `coder_router` | Pick Short-Running vs Long-Running |
+| `coder_planner` | `run_feature_list` (resume/reset) + **`run_coding_turn`** (approval gate → fresh G/E) |
+| `coder_generator` | Short-Running implement; Long-Running nested inside coding turn |
+| `coder_evaluator` | Short-Running QA; Long-Running nested PASS/FAIL (**read-only** FileAccess) |
+
+Long-Running notes: `run_coding_turn` pops a Shell approval card, then claims ready features and runs Generator/Evaluator on **new** `AgentSession`s (15‑min budget; FeatureList seed only). Existing list → `resume=true` / `reset=true` (reset archives). Short-Running FailGate is **per run** (advisory); hard-ish outer stop is ~80 messages on the handoff run.
+
+Details: [docs/agents.md · Coding](docs/agents.md).
 
 ## MCP (typically Research)
 

@@ -21,24 +21,33 @@ public static class AgentBootstrap
         ILoggerFactory? loggerFactory = null,
         IEnumerable<AIAgent>? backgroundAgents = null,
         IReadOnlySet<string>? mcpToolNames = null,
-        IReadOnlySet<string>? harness = null)
+        IReadOnlySet<string>? harness = null,
+        bool includeAskUser = true,
+        bool fileAccessReadOnly = false,
+        string? fileMemoryAgentId = null)
     {
+        // harness: null → resolve manifest/env/default.
+        // Empty HashSet → intentionally enable nothing (do not confuse with manifest []).
         var enabled = new HashSet<string>(
             harness ?? HarnessProfile.ResolveEnabled(agentId: agentId),
             StringComparer.OrdinalIgnoreCase);
-        var chat = ChatClientFactory.Create(agentId, loggerFactory);
-
-        // Platform HITL: every agent gets ask_user_* (Shell cards). Do not re-declare per factory.
-        var allTools = new List<AITool>(tools);
-        allTools.AddRange(AskUserTools.CreateApprovalRequired());
 
         // ask_user_* (and many domain tools) are ApprovalRequired — without UseToolApproval they hang forever.
-        if (!enabled.Contains(OrbitHarnessIds.ToolApproval))
+        if (includeAskUser && !enabled.Contains(OrbitHarnessIds.ToolApproval))
         {
             loggerFactory?.CreateLogger(typeof(AgentBootstrap)).LogWarning(
                 "Agent {AgentId}: harness omitted tool_approval but ApprovalRequired tools are present; enabling UseToolApproval automatically. Add \"tool_approval\" to agents/*.json harness.",
                 agentId);
             enabled.Add(OrbitHarnessIds.ToolApproval);
+        }
+
+        var chat = ChatClientFactory.Create(agentId, loggerFactory, enabled);
+
+        // Platform HITL: interactive agents get ask_user_* (Shell cards). Nested autonomous turns omit them.
+        var allTools = new List<AITool>(tools);
+        if (includeAskUser)
+        {
+            allTools.AddRange(AskUserTools.CreateApprovalRequired());
         }
 
         // /health Describe must see the same set (incl. auto tool_approval), not re-parse ORBIT_HARNESS alone.
@@ -59,7 +68,9 @@ public static class AgentBootstrap
 #pragma warning disable MAAI001 // FileSystemAgentFileStore / FileAccess experimental
         if (enabled.Contains(OrbitHarnessIds.FileMemory))
         {
-            var memoryRoot = HarnessProfile.ResolveFileMemoryRoot(agentId, contentRoot);
+            // Optional shared root (e.g. Coder handoff participants → data/file-memory/coder/).
+            var memoryId = string.IsNullOrWhiteSpace(fileMemoryAgentId) ? agentId : fileMemoryAgentId.Trim();
+            var memoryRoot = HarnessProfile.ResolveFileMemoryRoot(memoryId, contentRoot);
             Directory.CreateDirectory(memoryRoot);
             providers.Add(new FileMemoryProvider(new FileSystemAgentFileStore(memoryRoot)));
         }
@@ -70,7 +81,29 @@ public static class AgentBootstrap
             // (root is re-resolved per call; missing → create, do not leave tools that always throw).
             var accessRoot = HarnessProfile.ResolveFileAccessRoot(contentRoot);
             Directory.CreateDirectory(accessRoot);
-            providers.Add(new FileAccessProvider(new OrbitWorkspaceAgentFileStore(contentRoot)));
+            FileAccessProviderOptions? fileAccessOptions = null;
+            if (fileAccessReadOnly)
+            {
+                // Evaluator / read-only participants: ls/read/grep only, no write approval cards.
+                fileAccessOptions = new FileAccessProviderOptions
+                {
+                    DisableWriteTools = true,
+                    DisableReadOnlyToolApproval = true
+                };
+            }
+            else if (!includeAskUser)
+            {
+                // Nested autonomous turns (no Shell cards): disable FileAccess approval wrappers.
+                fileAccessOptions = new FileAccessProviderOptions
+                {
+                    DisableReadOnlyToolApproval = true,
+                    DisableWriteToolApproval = true
+                };
+            }
+
+            providers.Add(new FileAccessProvider(
+                new OrbitWorkspaceAgentFileStore(contentRoot),
+                fileAccessOptions));
         }
 #pragma warning restore MAAI001
 
@@ -80,7 +113,15 @@ public static class AgentBootstrap
             if (!string.IsNullOrWhiteSpace(skillsDir))
             {
                 // Progressive disclosure: catalog in prompt; body via load_skill tool.
-                providers.Add(new AgentSkillsProvider(skillsDir, loggerFactory: loggerFactory));
+                AgentSkillsProviderOptions? skillOptions = includeAskUser
+                    ? null
+                    : new AgentSkillsProviderOptions { DisableReadSkillResourceApproval = true };
+                providers.Add(skillOptions is null
+                    ? new AgentSkillsProvider(skillsDir, loggerFactory: loggerFactory)
+                    : new AgentSkillsProvider(
+                        skillsDir,
+                        options: skillOptions,
+                        loggerFactory: loggerFactory));
             }
         }
 
@@ -103,13 +144,16 @@ public static class AgentBootstrap
         var historyOptions = enabled.Contains(OrbitHarnessIds.Compaction)
             ? OrbitCompaction.CreateHistoryOptions(modelId)
             : new InMemoryChatHistoryProviderOptions();
+        // Stable Id+Name: Workflow.AsAIAgent session checkpoints key inner executors by these.
+        // Without Id, rehydrate after agent restart / approval resume can mis-bind participants.
         var options = new ChatClientAgentOptions
         {
+            Id = agentId,
             Name = agentId,
             Description = displayName,
             ChatOptions = new ChatOptions
             {
-                Instructions = AppendHarnessHints(instructions, enabled),
+                Instructions = AppendHarnessHints(instructions, enabled, includeAskUser, fileAccessReadOnly),
                 Tools = allTools,
                 MaxOutputTokens = OrbitCompaction.ResolveMaxOutputTokens(),
                 Reasoning = OrbitReasoning.ResolveOptions()
@@ -170,7 +214,11 @@ public static class AgentBootstrap
     /// Append English-only platform hints that match the enabled Harness modules.
     /// Agent-specific tool guidance belongs in each agent's own instructions.
     /// </summary>
-    private static string AppendHarnessHints(string instructions, IReadOnlySet<string> enabled)
+    private static string AppendHarnessHints(
+        string instructions,
+        IReadOnlySet<string> enabled,
+        bool includeAskUser,
+        bool fileAccessReadOnly)
     {
         var lines = new List<string> { "", "Harness:" };
 
@@ -193,8 +241,21 @@ public static class AgentBootstrap
 
         if (enabled.Contains(OrbitHarnessIds.FileAccess))
         {
-            lines.Add(
-                "- file_access_*: durable shared folder (reports/exports). ls/read/grep auto-run; write/delete/replace need user approval — call tools directly, do not only ask in plain text.");
+            if (fileAccessReadOnly)
+            {
+                lines.Add(
+                    "- file_access_*: read-only (ls/read/grep). Writes/deletes are disabled for this participant.");
+            }
+            else if (includeAskUser)
+            {
+                lines.Add(
+                    "- file_access_*: durable shared folder (reports/exports). ls/read/grep auto-run; write/delete/replace need user approval — call tools directly, do not only ask in plain text.");
+            }
+            else
+            {
+                lines.Add(
+                    "- file_access_*: durable workspace files. Call ls/read/grep/write/delete/replace directly (autonomous turn — no Shell approval cards).");
+            }
         }
 
         if (enabled.Contains(OrbitHarnessIds.Skills))
@@ -208,9 +269,16 @@ public static class AgentBootstrap
                 "- If BackgroundAgents are registered: start ALL tasks first, then wait/get_results/clear — never start→wait→start serially.");
         }
 
-        // Platform HITL tools are always registered (ask_user_*).
-        lines.Add(
-            "- User interaction: for clarifications (A/B), direction picks, or plan/execute confirmation, call ask_user_choice or ask_user_confirm. Never ask the user to type option letters or approval words in plain chat — the Shell shows clickable cards.");
+        if (includeAskUser)
+        {
+            lines.Add(
+                "- User interaction: for clarifications (A/B), direction picks, or plan/execute confirmation, call ask_user_choice or ask_user_confirm. Never ask the user to type option letters or approval words in plain chat — the Shell shows clickable cards.");
+        }
+        else
+        {
+            lines.Add(
+                "- Autonomous turn: do not ask the user; use tools and FeatureList only. Finish with a concise status.");
+        }
 
         return instructions + string.Join('\n', lines) + "\n";
     }

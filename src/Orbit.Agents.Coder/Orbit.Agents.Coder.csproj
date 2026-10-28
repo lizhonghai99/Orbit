@@ -14,6 +14,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Agents.AI" Version="1.26.0" />
     <PackageReference Include="Microsoft.Agents.AI.Hosting.AGUI.AspNetCore" Version="1.26.0-preview.261023.1" />
+    <PackageReference Include="Microsoft.Agents.AI.Workflows" Version="1.26.0" />
   </ItemGroup>
 
   <ItemGroup>

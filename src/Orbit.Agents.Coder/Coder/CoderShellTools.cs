@@ -110,7 +110,8 @@ public sealed class CoderShellTools
                 output = $"(no output, exit {process.ExitCode})";
             }
 
-            return output.Length <= 50_000 ? output : output[..50_000] + "\n…(truncated)";
+            // Full output for session JSONL / audit. Model context window is Compaction's job.
+            return output;
         }
         catch (Exception ex)
         {

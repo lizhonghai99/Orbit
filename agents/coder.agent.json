@@ -1,9 +1,9 @@
 {
   "id": "coder",
   "displayName": "Coding Assistant",
-  "description": "FileAccess + FileMemory + approved bash + todos/skills/compaction in the host workspace.",
+  "description": "Short-Running: router→generator→evaluator (HITL; FailGate per run + ~80 msg cap). Long-Running: router→planner; run_feature_list (resume/reset) + approved run_coding_turn = fresh Generator+Evaluator sessions (15m; read-only Evaluator).",
   "project": "src/Orbit.Agents.Coder/Orbit.Agents.Coder.csproj",
-  "capabilities": ["coder.file_access", "coder.file_memory", "coder.bash.hitl", "coder.plan", "skills"],
+  "capabilities": ["coder.file_access", "coder.file_memory", "coder.bash.hitl", "coder.plan", "coder.pipeline", "skills"],
   "protocol": "ag-ui",
   "workspace": "required",
   "harness": ["mode", "todo", "file_memory", "file_access", "skills", "compaction", "tool_approval"]

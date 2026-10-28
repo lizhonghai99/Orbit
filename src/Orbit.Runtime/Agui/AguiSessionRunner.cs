@@ -31,8 +31,12 @@ public sealed class AguiSessionRunner(
     /// <summary>sessionId → agentId for in-flight AG-UI turns (drain on Stopping).</summary>
     private readonly ConcurrentDictionary<string, string> _activeRuns = new(StringComparer.OrdinalIgnoreCase);
     /// <summary>
-    /// Per-session abort. ChatClientAgent turns cancel via CTS (Workflow CheckpointManager is for graphs;
-    /// AgentSession serialize in ExecuteTurnAsync finally is the resume snapshot for this path).
+    /// Per-session abort. Cancel via CTS.
+    /// Resume snapshot: <c>SerializeSessionAsync</c> in ExecuteTurnAsync finally — for
+    /// <c>Workflow.AsAIAgent</c> that blob already embeds the inner workflow checkpoint (MAF);
+    /// do not invent a second CheckpointManager beside AG-UI persistence. Explicit
+    /// <c>CheckpointManager</c> + <c>ResumeStreamingAsync</c> is for in-process graphs
+    /// (e.g. Research), not for the AG-UI agent surface.
     /// </summary>
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _runAbort =
         new(StringComparer.OrdinalIgnoreCase);

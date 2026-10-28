@@ -14,7 +14,10 @@ namespace Orbit.Agents.Hosting;
 /// </summary>
 public static class ChatClientFactory
 {
-    public static IChatClient Create(string agentId, ILoggerFactory? loggerFactory = null)
+    public static IChatClient Create(
+        string agentId,
+        ILoggerFactory? loggerFactory = null,
+        IReadOnlySet<string>? harness = null)
     {
         loggerFactory ??= CreateFallbackLoggerFactory();
         var mode = DescribeMode();
@@ -25,8 +28,10 @@ public static class ChatClientFactory
         }
 
         IChatClient inner = CreateResponsesClient();
-        var enabled = HarnessProfile.ResolveEnabled(
-            agentId: Environment.GetEnvironmentVariable("ORBIT_AGENT_ID"));
+        // Prefer caller harness (AgentBootstrap per-participant). Fall back to this agentId's
+        // manifest/env — not a different process-level ORBIT_AGENT_ID, so nested ids stay accurate.
+        var enabled = harness
+                      ?? HarnessProfile.ResolveEnabled(agentId: agentId);
 
         // Pipeline (Harness hand-assembly): logging → OTel → function invocation →
         // per-call history → optional ContextWindow compaction → AG-UI-safe args.

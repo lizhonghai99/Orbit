@@ -20,8 +20,8 @@ See also: [Architecture](architecture.md) · [Harness / HITL spike](spike-p0-hit
 | **Skills** | Progressive-disclosure `SKILL.md` playbooks |
 | **Memory** | FileMemory and related stores |
 | **Files** | FileAccess (durable / workspace disk) |
-| **Compaction** | Context-window compaction (on for every agent) |
-| **Tool approval** | HITL for mutating tools (on for every agent) |
+| **Compaction** | Context-window compaction (per-agent via `harness`) |
+| **Tool approval** | HITL for mutating tools (interactive agents; Long-Running coding turn is gated at `run_coding_turn`) |
 | **Sub-agents** | BackgroundAgents |
 | **Orchestration** | Workflow graphs / checkpoints |
 | **MCP** | External tools loaded at process start |
@@ -30,7 +30,7 @@ See also: [Architecture](architecture.md) · [Harness / HITL spike](spike-p0-hit
 
 **Always injected** (not via `harness`): platform `ask_user_*`.
 
-Manifest `harness` → `ORBIT_HARNESS`; include `compaction` / `tool_approval` when needed. Empty → `mode,todo,skills,compaction,tool_approval` (disk / Background still opt-in).
+Manifest `harness` → `ORBIT_HARNESS`; include `compaction` / `tool_approval` when needed. Omitted or `[]` → `mode,todo,skills,compaction,tool_approval` (disk / Background still opt-in). **Note:** `CreateAgent(harness: new HashSet())` means enable nothing — not the same as manifest `[]`.
 
 ---
 
@@ -41,16 +41,16 @@ Manifest `harness` → `ORBIT_HARNESS`; include `compaction` / `tool_approval` w
 | Purpose | Outlook Web triage | Multi-angle research + briefs | Edit/build/test in workspace |
 | Workspace | `none` | `optional` | **`required`** |
 | Mode / Todo | ✅ | ✅ | ✅ |
-| Skills | ✅ `outlook-triage` | ✅ `concurrent-research` | ✅ `minimal-diff` |
+| Skills | ✅ `outlook-triage` | ✅ `concurrent-research` | ✅ `minimal-diff` / `long-running` |
 | FileMemory | ✅ | ✅ | ✅ |
 | FileAccess | ❌ | ✅ | ✅ (session workspace) |
-| Compaction | ✅ | ✅ | ✅ |
+| Compaction | ✅ | ✅ | ✅ on `coder_generator`; planner/evaluator omit |
 | ToolApproval | ✅ | ✅ | ✅ |
-| BackgroundAgents | ❌ | ✅ `AngleResearcher` | ❌ |
-| Workflow | ❌ | ✅ Scope→Outline→Draft | ❌ |
+| BackgroundAgents | ❌ | ✅ `AngleResearcher` | ❌ (uses Handoffs) |
+| Workflow / harness | ❌ | ✅ Scope→Outline→Draft | ✅ Short/Long-Running + FeatureList |
 | MCP | configurable | configurable (often search) | configurable |
 | Login | Outlook Web | none | none |
-| Typical HITL | folder / move / archive | writes, MCP mutations, ask_user | writes, `bash` |
+| Typical HITL | folder / move / archive | writes, MCP mutations, ask_user | Short: writes/`bash`; Long: approve `run_coding_turn` then autonomous turn |
 
 ---
 
@@ -121,19 +121,50 @@ No invented citations; parallel start-all-then-wait (never serial start→wait�
 
 ### Purpose
 
-Mini Claude Code shape in the host **Workspace**: read/edit files, approved Git Bash for build/test/git.
+Externally one Coder. Internally two **routes** + four stable handoff **ids**:
+
+| Route | Chain |
+|-------|--------|
+| **Short-Running** | `coder_router` → `coder_generator` → `coder_evaluator` (HITL handoff) |
+| **Long-Running** | `coder_router` → `coder_planner`; each batch **`run_coding_turn`** (context reset) |
+
+| Id | Role |
+|----|------|
+| `coder_router` | Pick Short-Running vs Long-Running |
+| `coder_planner` | Long-Running only: `run_feature_list` (resume/reset) + **`run_coding_turn`** (approval gate) |
+| `coder_generator` | Short-Running implement (HITL); Long-Running nested with **new session** |
+| `coder_evaluator` | Short-Running QA (HITL); Long-Running nested with **new session** |
+
+Evaluator grades with PASS/FAIL (not exit-0 only). Playwright only for browser UI products.
 
 ### Harness
 
-Mode, Todo, Skills (`minimal-diff`), FileMemory, FileAccess, Compaction, ToolApproval — on; Background off.
+- `coder_generator`: mode, todo, skills, file_memory, file_access, compaction, tool_approval  
+- `coder_planner` / `coder_evaluator` / `coder_router`: tool_approval (+ ask_user on router)  
 
 ### Domain tools
 
-FileAccess read/write tools, approved `bash` (Git Bash only; `ORBIT_BASH_PATH` override; **no PowerShell fallback**), `get_coder_workspace`, `file_memory_*` for compaction-surviving notes.
+- **coder_generator**: FileAccess, `bash`, `get_coder_workspace`, `get_feature_list` / `set_feature_status` (in_progress|pending only)  
+- **coder_evaluator**: read-only FileAccess, `bash`, `get_feature_list` / `set_feature_status` (`done` requires `VERDICT: PASS`)  
+- **coder_planner**: `run_feature_list` (resume/reset), approved `run_coding_turn`, `get_feature_list` / `set_feature_status`  
+- **coder_router**: handoff + `ask_user_*`  
+
+### Path details
+
+1. Router → Short-Running generator, or Long-Running planner  
+2. Long-Running: `run_feature_list` → **`run_coding_turn`** (approval → claim → **fresh** G/E sessions; 15‑min timeout; FeatureList seed only)  
+3. Existing list: `resume=true` / `reset=true` (reset archives); Attempt / stuck `in_progress` / per-feature coding-turn (`MaxCodingTurns`) caps apply  
+4. Short-Running: generator → evaluator; FAIL→generator ~2× then ask user; PASS → router; soft message-count termination  
 
 ### Memory & context
 
-FileMemory for working notes (not a substitute for repo files). FileAccess root = session workspace snapshot. Compaction still applies.
+FeatureList is Long-Running ground truth (`data/feature-lists/{agentId}/`). **`run_coding_turn`** uses `CreateSessionAsync` (anti Context Anxiety). Entry requires approval; inside the turn bash/writes run autonomously in a trusted Workspace. Evaluator is **read-only** FileAccess. Compaction follows each participant's harness. Short-Running FailGate is **advisory** (per AG-UI `RunId`); the handoff graph also caps at ~80 messages for that run.
+
+**Interrupt / resume (framework, don’t reinvent):**
+- **Coder AG-UI / handoff:** persist `AgentSession` (`SerializeSession` embeds MAF workflow checkpoint). Tool approval → `CreateResponse` on that session.
+- **Research pipeline:** explicit `CheckpointManager` + `ResumeStreamingAsync` (no product FeatureList store).
+- **FeatureList:** durable resume = on-disk `feature-list.json` (`resume=true`); do not stack a unused graph-checkpoint layer on top.
+Scripted contract: `HandoffApprovalResumeTests`.
 
 ### Safety & limits
 
@@ -147,7 +178,7 @@ Workspace required; missing Git Bash fails closed; workspace switch may cancel r
 
 ### Compaction
 
-`ContextWindowCompactionStrategy` in the chat pipeline and history reducer when `compaction` is in `harness[]`. Shared defaults via `OrbitLlmContextWindow`. All three built-in agents list it explicitly.
+`ContextWindowCompactionStrategy` when `compaction` is in the participant / manifest `harness[]`. Shared defaults via `OrbitLlmContextWindow`. Compaction only shapes **model** context; session JSONL and Serilog stay **full** for audit (Shell trajectory labels may still clip for display).
 
 ### Memory kinds
 

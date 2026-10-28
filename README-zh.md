@@ -36,11 +36,11 @@
 | `Orbit.Agents.Browser` | 共享 Playwright 包（仅 profile；不含领域逻辑） |
 | `Orbit.Agents.Mail` | Outlook Web 整理（HITL；永不自动删除） |
 | `Orbit.Agents.Research` | BackgroundAgents + Workflow Scope→Outline→Draft + 检查点 |
-| `Orbit.Agents.Coder` | FileAccess + FileMemory + 审批 Git Bash；宿主 Workspace 必填 |
+| `Orbit.Agents.Coder` | Short-Running / Long-Running（`coder_*` handoff + FeatureList）；Workspace 必填 |
 | `agents/*.json` | 静态发现（仅顶层；`deferred/` 不加载） |
 | `data/` | 本地会话 / profile / MCP / workspace（**不进 git**） |
 
-测试：`Orbit.Contracts.Tests`、`Orbit.Agents.Hosting.Tests`、`Orbit.Agents.Coder.Tests`、`Orbit.Runtime.Tests`、`Orbit.Shell.Tests`（撰写时 **327** 全绿）。
+测试：`Orbit.Contracts.Tests`、`Orbit.Agents.Hosting.Tests`、`Orbit.Agents.Coder.Tests`、`Orbit.Runtime.Tests`、`Orbit.Shell.Tests`（撰写时 **378** 全绿；Coder 含 handoff 审批恢复契约测）。
 
 ### Skills（每 Agent 自有）
 
@@ -93,7 +93,7 @@
 | Agent | `harness` | 说明 |
 |-------|-----------|------|
 | Mail | `mode,todo,file_memory,skills,compaction,tool_approval` | 无 FileAccess；笔记与邮箱登记同根 |
-| Coder | `mode,todo,file_memory,file_access,skills,compaction,tool_approval` | bash 自有；笔记 ≠ 仓库文件 |
+| Coder | `mode,todo,file_memory,file_access,skills,compaction,tool_approval` | `coder_generator` 实现；`coder_evaluator` PASS/FAIL 验收 |
 | Research | 上述 + `background` | 完整研究栈 |
 | （清单为空时默认） | `mode,todo,skills,compaction,tool_approval` | 磁盘 / Background 仍需 opt-in |
 
@@ -131,6 +131,26 @@
 ```powershell
 pwsh src/Orbit.Agents.Mail/bin/Debug/net10.0/playwright.ps1 install chromium
 ```
+
+## Coder（Short-Running / Long-Running）
+
+对外一个 Coder；对内两条路由 + 四个 handoff id：
+
+| 路由 | 链路 |
+|------|------|
+| **Short-Running** | `coder_router` → `coder_generator` → `coder_evaluator`（HITL） |
+| **Long-Running** | `coder_router` → `coder_planner`；每批 `run_coding_turn`（**context reset**） |
+
+| Id | 职责 |
+|----|------|
+| `coder_router` | 选 Short-Running / Long-Running |
+| `coder_planner` | `run_feature_list`（resume/reset）+ **`run_coding_turn`**（入口审批 → 全新 G/E） |
+| `coder_generator` | Short-Running 实现；Long-Running 在 coding turn 内嵌套 |
+| `coder_evaluator` | Short-Running QA；Long-Running 嵌套 PASS/FAIL（**只读** FileAccess） |
+
+Long-Running：`run_coding_turn` 先弹 Shell 审批卡，再 claim ready 并在**新** `AgentSession` 上跑 Generator/Evaluator（15 分钟预算；种子只有 FeatureList）。已有清单用 `resume=true` / `reset=true`（reset 会归档旧文件）。Short-Running FailGate **按 run**（提示级）；硬一点的外层停靠约 80 条 handoff 消息。
+
+详见 [docs/agents-zh.md · 编程助手](docs/agents-zh.md)。
 
 ## MCP（常用在 Research）
 

@@ -4,7 +4,6 @@ using Orbit.Agents.Hosting;
 
 var agentId = Environment.GetEnvironmentVariable("ORBIT_AGENT_ID") ?? "coder";
 
-// Workspace: ORBIT_WORKSPACE → ORBIT_CODER_ROOT → ORBIT_CODE_ROOT → ORBIT_ROOT → exe dir.
 var workspace = FirstNonEmpty(
     Environment.GetEnvironmentVariable("ORBIT_WORKSPACE"),
     Environment.GetEnvironmentVariable("ORBIT_CODER_ROOT"),
@@ -33,34 +32,37 @@ var app = AgentHost.BuildAguiHost(
     configureServices: builder =>
     {
         builder.Services.AddSingleton(shell);
+        builder.Services.AddSingleton(sp =>
+            new FeatureListWorkflow(
+                agentId,
+                contentRoot: null,
+                chatFactory: null,
+                loggerFactory: sp.GetRequiredService<ILoggerFactory>()));
         builder.Services.AddSingleton(sp => CoderAgentFactory.Create(
             agentId,
             "Coding Assistant",
-            """
-            You are Orbit's Coding Assistant — a programming agent.
-
-            Workspace root is dynamic per run: always call get_coder_workspace (or use FileAccess paths
-            relative to that root). Do not assume the path printed at process start is authoritative
-            when X-Orbit-Workspace is set for the session.
-
-            Philosophy (from Mini Claude Code / 09 practice):
-            Agent = tools + keep calling tools until the task is done. No magic.
-
-            Loop: short think → use tools → report results.
-            Rules:
-            - Act first; do not only explain.
-            - Never invent file paths; list/read when unsure.
-            - Minimize changes; no over-engineering.
-            - When finished, summarize what changed.
-            """,
             shell,
-            loggerFactory: sp.GetRequiredService<ILoggerFactory>()));
+            sp.GetRequiredService<FeatureListWorkflow>(),
+            loggerFactory: sp.GetRequiredService<ILoggerFactory>(),
+            contentRoot: builder.Environment.ContentRootPath));
     },
-    healthExtras: _ => new Dictionary<string, string>
+    healthExtras: sp =>
     {
-        ["capability"] = "coder+file_access+bash",
-        ["workspace"] = shell.WorkspaceRoot,
-        ["shell"] = CoderShellTools.DescribePreferredShell()
+        var featureList = sp.GetRequiredService<FeatureListWorkflow>();
+        return new Dictionary<string, string>
+        {
+            ["capability"] = "handoff+Short-Running|Long-Running+context-reset",
+            ["router"] = CoderAgentFactory.RouterId,
+            ["planner"] = CoderAgentFactory.PlannerId,
+            ["generator"] = CoderAgentFactory.GeneratorId,
+            ["evaluator"] = CoderAgentFactory.EvaluatorId,
+            ["shortRunning"] = "router→generator→evaluator (HITL)",
+            ["longRunning"] = "router→planner; run_coding_turn=fresh Generator+Evaluator sessions",
+            ["featureList"] = "feature_list.plan→release_ready; QA in run_coding_turn",
+            ["featureListRoot"] = featureList.StoreRootHint,
+            ["workspace"] = shell.WorkspaceRoot,
+            ["shell"] = CoderShellTools.DescribePreferredShell()
+        };
     });
 
 try

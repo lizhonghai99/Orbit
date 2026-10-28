@@ -149,11 +149,12 @@ public static class InvocationTelemetryStore
             {
                 if (result is not null)
                 {
+                    // Full result for session meta.tool_invocation (audit). Compaction owns model context.
                     preview = result switch
                     {
-                        string s => Truncate(s, 800),
-                        JsonElement je => Truncate(je.GetRawText(), 800),
-                        _ => Truncate(JsonSerializer.Serialize(result, JsonOptions), 800)
+                        string s => s,
+                        JsonElement je => je.GetRawText(),
+                        _ => JsonSerializer.Serialize(result, JsonOptions)
                     };
                 }
             }
@@ -268,7 +269,4 @@ public static class InvocationTelemetryStore
 
     private static string SpanKey(ToolInvocationSpanDto s) =>
         $"{s.RunId}|{s.CallId}|{s.Name}|{s.StartedAt:O}|{s.EndedAt:O}";
-
-    private static string Truncate(string text, int max) =>
-        text.Length <= max ? text : text[..max] + "…";
 }

@@ -30,7 +30,7 @@
 
 **平台始终注入（不在 `harness`）**：`ask_user_*`。
 
-清单里的 `harness` 写入 `ORBIT_HARNESS`；按能力需要勾选，含 `compaction` / `tool_approval`。空则默认 `mode,todo,skills,compaction,tool_approval`（磁盘 / Background 仍需显式 opt-in）。
+清单里的 `harness` 写入 `ORBIT_HARNESS`；按能力需要勾选，含 `compaction` / `tool_approval`。清单省略或 `[]` → 默认 `mode,todo,skills,compaction,tool_approval`（磁盘 / Background 仍需显式 opt-in）。**注意：** 代码里 `CreateAgent(harness: new HashSet())` 空集合表示「全关」，与清单 `[]` 语义不同。
 
 ---
 
@@ -41,13 +41,13 @@
 | 定位 | Outlook 网页收件箱整理 | 多角度调研 + 结构化简报 | 工作区内读改代码 / 构建测试 |
 | Workspace | `none` | `optional` | **`required`** |
 | Mode / Todo | ✅ | ✅ | ✅ |
-| Skills | ✅ `outlook-triage` | ✅ `concurrent-research` | ✅ `minimal-diff` |
+| Skills | ✅ `outlook-triage` | ✅ `concurrent-research` | ✅ `minimal-diff` / `long-running` |
 | FileMemory | ✅ | ✅ | ✅ |
 | FileAccess | ❌ | ✅ | ✅（跟会话工作区） |
-| Compaction | ✅ | ✅ | ✅ |
+| Compaction | ✅ | ✅ | ✅ `coder_generator`；planner/evaluator 不含 |
 | ToolApproval | ✅ | ✅ | ✅ |
-| BackgroundAgents | ❌ | ✅ `AngleResearcher` | ❌ |
-| Workflow | ❌ | ✅ Scope→Outline→Draft | ❌ |
+| BackgroundAgents | ❌ | ✅ `AngleResearcher` | ❌（用 Handoffs） |
+| Workflow / harness | ❌ | ✅ Scope→Outline→Draft | ✅ Short/Long-Running + FeatureList |
 | MCP | 可配（`data/mcp/mail.json`） | 可配（常用搜索类） | 可配 |
 | 登录 | Outlook Web（浏览器 profile） | 不需要 | 不需要 |
 | 典型 HITL | 建夹 / 移动 / 归档 | 写文件、MCP 突变、`ask_user_*` | 写/删文件、`bash` |
@@ -167,36 +167,61 @@
 
 ### 定位
 
-在宿主 **Workspace** 内做「小 Claude Code」形态：读改文件、审批后跑构建/测试/git（Git Bash）。
+对外一个 Coder；对内两条路由 + 四个 handoff **id**（id 固定，路由名统一用英文）：
+
+| 路由 | 链路 |
+|------|------|
+| **Short-Running** | `coder_router` → `coder_generator` → `coder_evaluator`（HITL handoff） |
+| **Long-Running** | `coder_router` → `coder_planner`；每批 **`run_coding_turn`**（context reset） |
+
+| Id | 职责 |
+|----|------|
+| `coder_router` | 选 Short-Running / Long-Running |
+| `coder_planner` | 仅 Long-Running：`run_feature_list`（resume/reset）+ **`run_coding_turn`**（入口审批） |
+| `coder_generator` | Short-Running 实现（HITL）；Long-Running 在 coding turn 内嵌套、**新 session** |
+| `coder_evaluator` | Short-Running QA（HITL）；Long-Running 在 coding turn 内嵌套、**新 session** |
 
 ### Harness 剖面
 
-| 模块 | 状态 |
-|------|------|
-| Mode / Todo | 开 — 多文件改动先 plan |
-| Skills | 开 — `minimal-diff` |
-| FileAccess | 开 — 根 = 会话 Workspace |
-| FileMemory | 开 — `data/file-memory/coder/`（会话工作笔记；不是仓库替身） |
-| Compaction / ToolApproval | 开 |
-| Background | 关 |
+| 参与者 | 模块 |
+|--------|------|
+| `coder_generator` | mode / todo / skills / file_memory / file_access / compaction / tool_approval |
+| `coder_planner` / `coder_evaluator` / `coder_router` | tool_approval（router 另有 ask_user） |
 
 ### 领域能力
 
-- FileAccess：`ls` / `read` / `grep`（只读常自动过批）· `write` / `replace` / `delete`（需批）
-- `bash`：Git Bash 白名单命令；**无 PowerShell 回退**（可用 `ORBIT_BASH_PATH`）
-- `get_coder_workspace`：返回本轮工作区根
+- **coder_generator**：FileAccess、`bash`、`get_feature_list` / `set_feature_status`  
+- **coder_evaluator**：`bash`、`get_feature_list` / `set_feature_status`（done/failed + VERDICT）  
+- **coder_planner**：`run_feature_list`、`get_feature_list` / `set_feature_status`  
+- **coder_router**：handoff + `ask_user_*`
+
+### 路径细节
+
+1. Router → Short-Running 的 generator，或 Long-Running 的 planner  
+2. Long-Running：`run_feature_list` → **`run_coding_turn`**（Shell 审批卡 → claim → **全新** G/E session；15 分钟超时；种子只有 FeatureList）  
+3. 已有清单：`resume=true` 下一批，或 `reset=true`（归档后重规划）；`Attempt` / 卡住的 `in_progress` / 每 feature 的 coding-turn（`MaxCodingTurns`）有上限  
+4. Short-Running：generator → evaluator；FAIL→generator **最多约 2 次**，再请用户确认；PASS → router；会话消息软上限终止  
 
 ### Skill
 
 | Id | 作用 |
 |----|------|
 | `minimal-diff` | 先读后写、优先最小替换、改完总结 |
+| `long-running` | Long-Running + `run_coding_turn` context reset |
 
 ### 记忆与上下文
 
-- **FileMemory**：抗 compaction 的工作笔记（计划、约束、待办上下文）；**代码与正式产物仍以仓库 + FileAccess 为准**
-- **FileAccess** = 工作区磁盘；会话创建时快照路径，之后不可变
-- Compaction：长日志/大 diff 对话仍受 ContextWindow 约束
+- **FeatureList**：Long-Running 跨 turn 唯一真相，`data/feature-lists/coder/`  
+- **Context reset**：`run_coding_turn` 内 `CreateSessionAsync`；外层 AG-UI 聊天**不是** G/E 的上下文  
+- **Compaction**：按**参与者** harness 挂到 ChatClient（generator 开；planner/evaluator 不开）  
+- Long-Running：`run_coding_turn` **入口**要审批；turn 内 bash/写文件在可信 Workspace 自主跑；Evaluator **只读** FileAccess
+- Short-Running FailGate 是**提示级**（按 AG-UI `RunId`）；handoff 图另有约 80 条消息的外层上限
+- **中断/恢复（用框架，不另造）**：
+  - Coder AG-UI/handoff：持久化 `AgentSession`（内嵌 MAF workflow checkpoint）；审批用 `CreateResponse` 续跑
+  - Research 管线：显式 `CheckpointManager` + `ResumeStreamingAsync`（没有 FeatureList 这种产品落盘）
+  - FeatureList：续跑靠磁盘 `feature-list.json`（`resume=true`），不叠一层写了却从不 `ResumeStreamingAsync` 的 checkpoint
+  - 契约测：`HandoffApprovalResumeTests`  
+- Short-Running：写文件/`bash` 仍 HITL
 
 ### 安全边界
 
@@ -219,7 +244,8 @@
 
 - 实现：`ContextWindowCompactionStrategy`（管道内 `CompactionProvider` + 历史 `AsChatReducer`）
 - 默认窗口与 `OrbitLlmContextWindow` / 环境变量对齐
-- **清单 `harness` 含 `compaction` 时挂载**；三套内置 Agent 均已显式配置
+- **清单 `harness` 含 `compaction` 时挂载**（Agent 管道 + Runtime 会话 `AsChatReducer`）
+- 压缩只跟 harness 走（Short-Running 的 `coder_generator`）；Long-Running 靠 `run_coding_turn` context reset + FeatureList
 
 ### 记忆
 
@@ -244,8 +270,9 @@
 
 ### 轨迹 vs 日志
 
-- **轨迹**：会话事件树（给用户回放）
-- **日志**：`%LOCALAPPDATA%/Orbit/logs/`（`runtime-*.log` / `agent-*.log` / `shell-*.log`，Serilog）
+- **轨迹（会话 JSONL）**：user / assistant / tool_call / tool_result 等**全量落盘**（便于追溯）；Shell 列表里的短摘要只是 UI 投影裁切
+- **日志**：`%LOCALAPPDATA%/Orbit/logs/`（`runtime-*.log` / `agent-*.log` / `shell-*.log`，Serilog）按 Information+ **全量写文件**（按天滚、留 14 天）
+- **Compaction**：只影响发给模型的上下文，由 MAF 策略自动处理；Orbit 不再对工具结果 / bash 输出做业务侧截断
 
 ---
 
